@@ -1131,7 +1131,8 @@ static inline void cvmx_wqe_set_grp(cvmx_wqe_t *work, int grp)
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
 		unsigned node = cvmx_get_node_num();
 		/* Legacy: GRP[0..2] :=QOS */
-		work->word1.cn78xx.grp = 0xff & (grp << 3);
+		work->word1.cn78xx.grp &= 0x7;
+		work->word1.cn78xx.grp |= 0xff & (grp << 3);
 		work->word1.cn78xx.grp |= (node << 8);
 	} else if (octeon_has_feature(OCTEON_FEATURE_CN68XX_WQE))
 		work->word1.cn68xx.grp = grp;
@@ -1207,7 +1208,7 @@ static inline void cvmx_wqe_set_len(cvmx_wqe_t *work, int len)
 static inline int cvmx_wqe_get_rcv_err(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		if (wqe->word2.err_level == CVMX_PKI_ERRLEV_E_RE ||
 				wqe->word2.err_code != 0)
 		    return wqe->word2.err_code;
@@ -1254,7 +1255,7 @@ static inline uint8_t cvmx_wqe_get_unused8(cvmx_wqe_t *work)
 	uint8_t bits;
 
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		bits = wqe->word2.rsvd_0;
 	}
 	else if (octeon_has_feature(OCTEON_FEATURE_CN68XX_WQE))
@@ -1268,7 +1269,7 @@ static inline uint8_t cvmx_wqe_get_unused8(cvmx_wqe_t *work)
 static inline void cvmx_wqe_set_unused8(cvmx_wqe_t *work, uint8_t v)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		wqe->word2.rsvd_0 = v;
 	}
 	else if (octeon_has_feature(OCTEON_FEATURE_CN68XX_WQE))
@@ -1339,7 +1340,7 @@ static inline void cvmx_wqe_set_style(cvmx_wqe_t *work, int style)
 static inline int cvmx_wqe_is_l3_ip(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		/* Match all 4 values for v4/v6 with.without options */
 		if((wqe->word2.lc_hdr_type & 0x1c) == CVMX_PKI_LTYPE_E_IP4)
 			return 1;
@@ -1354,7 +1355,7 @@ static inline int cvmx_wqe_is_l3_ip(cvmx_wqe_t *work)
 static inline int cvmx_wqe_is_l3_ipv4(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		/* Match 2 values - with/wotuout options */
 		if((wqe->word2.lc_hdr_type & 0x1e) == CVMX_PKI_LTYPE_E_IP4)
 			return 1;
@@ -1369,7 +1370,7 @@ static inline int cvmx_wqe_is_l3_ipv4(cvmx_wqe_t *work)
 static inline int cvmx_wqe_is_l3_ipv6(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		/* Match 2 values - with/wotuout options */
 		if((wqe->word2.lc_hdr_type & 0x1e) == CVMX_PKI_LTYPE_E_IP6)
 			return 1;
@@ -1384,7 +1385,7 @@ static inline int cvmx_wqe_is_l3_ipv6(cvmx_wqe_t *work)
 static inline bool cvmx_wqe_is_l4_udp_or_tcp(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		if (wqe->word2.lf_hdr_type  == CVMX_PKI_LTYPE_E_TCP)
 			return true;
 		if (wqe->word2.lf_hdr_type  == CVMX_PKI_LTYPE_E_UDP)
@@ -1401,7 +1402,7 @@ static inline bool cvmx_wqe_is_l4_udp_or_tcp(cvmx_wqe_t *work)
 static inline int cvmx_wqe_is_l2_bcast(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		return wqe->word2.is_l2_bcast;
 	}
 	else
@@ -1411,7 +1412,7 @@ static inline int cvmx_wqe_is_l2_bcast(cvmx_wqe_t *work)
 static inline int cvmx_wqe_is_l2_mcast(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		return wqe->word2.is_l2_mcast;
 	}
 	else
@@ -1421,7 +1422,7 @@ static inline int cvmx_wqe_is_l2_mcast(cvmx_wqe_t *work)
 static inline void cvmx_wqe_set_l2_bcast(cvmx_wqe_t *work, bool bcast)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		wqe->word2.is_l2_bcast = bcast;
 	}
 	else
@@ -1431,7 +1432,7 @@ static inline void cvmx_wqe_set_l2_bcast(cvmx_wqe_t *work, bool bcast)
 static inline void cvmx_wqe_set_l2_mcast(cvmx_wqe_t *work, bool mcast)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		wqe->word2.is_l2_mcast = mcast;
 	}
 	else
@@ -1441,7 +1442,7 @@ static inline void cvmx_wqe_set_l2_mcast(cvmx_wqe_t *work, bool mcast)
 static inline int cvmx_wqe_is_l3_bcast(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		return wqe->word2.is_l3_bcast;
 	}
 	cvmx_dprintf("%s: ERROR: not supported for model\n",__func__);
@@ -1451,7 +1452,7 @@ static inline int cvmx_wqe_is_l3_bcast(cvmx_wqe_t *work)
 static inline int cvmx_wqe_is_l3_mcast(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)){
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		return wqe->word2.is_l3_mcast;
 	}
 	cvmx_dprintf("%s: ERROR: not supported for model\n",__func__);
@@ -1470,7 +1471,7 @@ static inline int cvmx_wqe_is_l3_mcast(cvmx_wqe_t *work)
 static inline int cvmx_wqe_is_ip_exception(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		if (wqe->word2.err_level == CVMX_PKI_ERRLEV_E_LC)
 			return 1;
 		else
@@ -1483,7 +1484,7 @@ static inline int cvmx_wqe_is_ip_exception(cvmx_wqe_t *work)
 static inline int cvmx_wqe_is_l4_error(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		if (wqe->word2.err_level == CVMX_PKI_ERRLEV_E_LF)
 			return 1;
 		else
@@ -1496,7 +1497,7 @@ static inline int cvmx_wqe_is_l4_error(cvmx_wqe_t *work)
 static inline void cvmx_wqe_set_vlan(cvmx_wqe_t *work, bool set)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 			wqe->word2.vlan_valid = set;
 	}
 	else
@@ -1507,7 +1508,7 @@ static inline void cvmx_wqe_set_vlan(cvmx_wqe_t *work, bool set)
 static inline int cvmx_wqe_is_vlan(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 			return wqe->word2.vlan_valid;
 	}
 	else
@@ -1517,7 +1518,7 @@ static inline int cvmx_wqe_is_vlan(cvmx_wqe_t *work)
 static inline int cvmx_wqe_is_vlan_stacked(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		return wqe->word2.vlan_stacked;
 	}
 	else
@@ -1574,7 +1575,7 @@ void cvmx_wqe_free(cvmx_wqe_t *work);
 static inline bool cvmx_wqe_is_soft(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		return wqe->word2.software;
 	}
 	else
@@ -1690,7 +1691,7 @@ static inline unsigned cvmx_wqe_set_bufs(cvmx_wqe_t *work, unsigned bufs)
 static inline unsigned cvmx_wqe_get_l3_offset(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		/* Match 4 values: IPv4/v6 w/wo options */
 		if ((wqe->word2.lc_hdr_type & 0x1c) == CVMX_PKI_LTYPE_E_IP4)
 			return wqe->word4.ptr_layer_c;
@@ -1714,7 +1715,7 @@ static inline unsigned cvmx_wqe_get_l3_offset(cvmx_wqe_t *work)
 static inline unsigned cvmx_wqe_set_l3_offset(cvmx_wqe_t *work, unsigned ip_off)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		/* Match 4 values: IPv4/v6 w/wo options */
 		if ((wqe->word2.lc_hdr_type & 0x1c) == CVMX_PKI_LTYPE_E_IP4)
 			wqe->word4.ptr_layer_c = ip_off;
@@ -1736,7 +1737,7 @@ static inline unsigned cvmx_wqe_set_l3_offset(cvmx_wqe_t *work, unsigned ip_off)
 static inline void cvmx_wqe_set_l3_ipv4(cvmx_wqe_t *work, bool set)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		if (set)
 			wqe->word2.lc_hdr_type = CVMX_PKI_LTYPE_E_IP4;
 		else
@@ -1757,7 +1758,7 @@ static inline void cvmx_wqe_set_l3_ipv4(cvmx_wqe_t *work, bool set)
 static inline void cvmx_wqe_set_l3_ipv6(cvmx_wqe_t *work, bool set)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		if (set)
 			wqe->word2.lc_hdr_type = CVMX_PKI_LTYPE_E_IP6;
 		else
@@ -1776,7 +1777,7 @@ static inline void cvmx_wqe_set_l3_ipv6(cvmx_wqe_t *work, bool set)
 static inline void cvmx_wqe_set_l4_udp(cvmx_wqe_t *work, bool set)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		if (set)
 			wqe->word2.lf_hdr_type  = CVMX_PKI_LTYPE_E_UDP;
 		else
@@ -1794,7 +1795,7 @@ static inline void cvmx_wqe_set_l4_udp(cvmx_wqe_t *work, bool set)
 static inline void cvmx_wqe_set_l4_tcp(cvmx_wqe_t *work, bool set)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		if (set)
 			wqe->word2.lf_hdr_type  = CVMX_PKI_LTYPE_E_TCP;
 		else
@@ -1812,7 +1813,7 @@ static inline void cvmx_wqe_set_l4_tcp(cvmx_wqe_t *work, bool set)
 static inline void cvmx_wqe_set_soft(cvmx_wqe_t *work, bool set)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t* wqe = (void *)work;
+		cvmx_wqe_78xx_t* wqe = (cvmx_wqe_78xx_t *)work;
 		wqe->word2.software = set;
 	}
 	else 
@@ -1825,7 +1826,7 @@ static inline void cvmx_wqe_set_soft(cvmx_wqe_t *work, bool set)
 static inline bool  cvmx_wqe_is_l3_frag(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		return (wqe->word2.is_frag != 0);
 	}
 	else {
@@ -1842,7 +1843,7 @@ static inline bool  cvmx_wqe_is_l3_frag(cvmx_wqe_t *work)
 static inline void cvmx_wqe_set_l3_frag(cvmx_wqe_t *work, bool set)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		wqe->word2.is_frag = set;
 	}
 	else {
@@ -1857,7 +1858,7 @@ static inline void cvmx_wqe_set_l3_frag(cvmx_wqe_t *work, bool set)
 static inline void cvmx_wqe_set_l3_rarp(cvmx_wqe_t *work, bool set)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		if (set)
 			wqe->word2.lc_hdr_type = CVMX_PKI_LTYPE_E_RARP;
 		else
@@ -1874,7 +1875,7 @@ static inline void cvmx_wqe_set_l3_rarp(cvmx_wqe_t *work, bool set)
 static inline void cvmx_wqe_set_l3_arp(cvmx_wqe_t *work, bool set)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		if (set)
 			wqe->word2.lc_hdr_type = CVMX_PKI_LTYPE_E_ARP;
 		else
@@ -1891,7 +1892,7 @@ static inline void cvmx_wqe_set_l3_arp(cvmx_wqe_t *work, bool set)
 static inline bool cvmx_wqe_is_l3_arp(cvmx_wqe_t *work)
 {
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_78xx_t *wqe = (void *)work;
+		cvmx_wqe_78xx_t *wqe = (cvmx_wqe_78xx_t *)work;
 		return (wqe->word2.lc_hdr_type  == CVMX_PKI_LTYPE_E_ARP);
 	}
 	else {

@@ -641,6 +641,7 @@ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
 	return vcpu->kvm->arch.ops->vcpu_setup(vcpu);
 }
 
+#ifdef CONFIG_KVM_MIPS_TE
 static
 void kvm_mips_set_c0_status(void)
 {
@@ -800,8 +801,8 @@ skip_emul:
 	}
 
 	return ret;
->>>>>>> ef6bb31... KVM: MIPS: Don't leak FPU/DSP to guest
 }
+#endif
 
 int __init kvm_mips_init(void)
 {

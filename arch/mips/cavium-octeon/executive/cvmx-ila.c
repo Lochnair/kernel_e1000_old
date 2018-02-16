@@ -94,13 +94,21 @@ retry:
 	if (rx_cfg1.s.rx_bdry_lock_ena == 0) {
 		/* (GSER-21957) GSER RX Equalization may make >= 5gbaud non-KR
 		   channel better */
-		if (OCTEON_IS_MODEL(OCTEON_CN78XX_PASS1_X)) {
+		if (OCTEON_IS_MODEL(OCTEON_CN78XX)) {
 			int qlm;
 			for (qlm = 2; qlm < 4; qlm++) {
-				if ((qlm == 2) && (lane_mask & 0xf))
-					__cvmx_qlm_rx_equalization(node, qlm, (lane_mask & 0xf));
-				if ((qlm == 3) && (lane_mask & 0xf0))
-					__cvmx_qlm_rx_equalization(node, qlm, (lane_mask >> 4) & 0xf);
+				if ((qlm == 2) && (lane_mask & 0xf)) {
+					if (__cvmx_qlm_rx_equalization(node, qlm, (lane_mask & 0xf))) {
+						/*cvmx_dprintf("%d:ILA: Waiting for RX Equalization on QLM2\n", node); */
+						goto retry;
+					}
+				}
+				if ((qlm == 3) && (lane_mask & 0xf0)) {
+					if (__cvmx_qlm_rx_equalization(node, qlm, (lane_mask >> 4) & 0xf)) {
+						/*cvmx_dprintf("%d:ILA: Waiting for RX Equalization on QLM3\n", node); */
+						goto retry;
+					}
+				}
 			}
 		}
 		/* Clear the boundary lock status bit */

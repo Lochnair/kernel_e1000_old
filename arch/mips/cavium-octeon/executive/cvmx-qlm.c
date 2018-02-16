@@ -1,5 +1,5 @@
 /***********************license start***************
- * Copyright (c) 2011-2015  Cavium Inc. (support@cavium.com). All rights
+ * Copyright (c) 2011-2016  Cavium Inc. (support@cavium.com). All rights
  * reserved.
  *
  *
@@ -42,7 +42,7 @@
  *
  * Helper utilities for qlm.
  *
- * <hr>$Revision: 131066 $<hr>
+ * <hr>$Revision: 165972 $<hr>
  */
 #ifdef CVMX_BUILD_FOR_LINUX_KERNEL
 #include <asm/octeon/cvmx.h>
@@ -2126,6 +2126,9 @@ int cvmx_qlm_measure_clock(int qlm)
 	return ref_clock[qlm];
 }
 
+//#define DEBUG_QLM
+//#define DEBUG_QLM_RX
+
 /*
  * Perform RX equalization on a QLM
  *
@@ -2138,48 +2141,64 @@ int cvmx_qlm_measure_clock(int qlm)
 int __cvmx_qlm_rx_equalization(int node, int qlm, int lane)
 {
 	cvmx_gserx_phy_ctl_t phy_ctl;
-	cvmx_gserx_spd_t gserx_spd;
-	int fail, gbaud, l;
+	cvmx_gserx_br_rxx_ctl_t rxx_ctl;
+	cvmx_gserx_br_rxx_eer_t rxx_eer;
+	cvmx_gserx_rx_eie_detsts_t eie_detsts;
+	int fail, gbaud, l, lane_mask;
 	enum cvmx_qlm_mode mode;
-	int max_lanes = 4;
-
-	/* Errata (GSER-20075) GSER(0..13)_BR_RX3_EER[RXT_ERR] is
-	   GSER(0..13)_BR_RX2_EER[RXT_ERR]. Since lanes 2-3 are tied together,
-	   we only do RX equalization on 2 and ignore 3 */
-	if (OCTEON_IS_MODEL(OCTEON_CN78XX_PASS1_X))
-		max_lanes = 3;
+	int max_lanes = cvmx_qlm_get_lanes(qlm);
+	cvmx_gserx_lane_mode_t lmode;
+	cvmx_gserx_lane_px_mode_1_t pmode_1;
+	int pending = 0;
+	uint64_t timeout;
 
 	/* Don't touch QLMs if it is reset or powered down */
 	phy_ctl.u64 = cvmx_read_csr_node(node, CVMX_GSERX_PHY_CTL(qlm));
 	if (phy_ctl.s.phy_pd || phy_ctl.s.phy_reset)
 		return -1;
 
-	if (OCTEON_IS_MODEL(OCTEON_CN78XX))
+	/* Check whether GSER PRBS pattern matcher is enabled on any of the
+	   applicable lanes. Can't complete RX Equalization while pattern matcher
+	   is enabled because it causes errors */
+	for (l = 0; l < max_lanes; l++) {
+		cvmx_gserx_lanex_lbert_cfg_t lbert_cfg;
+
+		if ((lane != -1) && (lane != l))
+			continue;
+
+		lbert_cfg.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANEX_LBERT_CFG(l, qlm));
+		if (lbert_cfg.s.lbert_pm_en == 1)
+			return -1;
+	}
+
+	/* Get Lane Mode */
+	lmode.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANE_MODE(qlm));
+
+	/* Check to see if in VMA manual mode is set. If in VMA manual mode
+	   don't complete rx equalization */
+	pmode_1.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANE_PX_MODE_1(lmode.s.lmode, qlm));
+	if (pmode_1.s.vma_mm == 1) {
+#ifdef DEBUG_QLM
+	    cvmx_dprintf("N%d:QLM%d: VMA Manual (manual DFE) selected. Not completing Rx equalization\n", node, qlm);
+#endif
+	    return 0;
+	}
+
+	if (OCTEON_IS_MODEL(OCTEON_CN78XX)) {
 		gbaud = cvmx_qlm_get_gbaud_mhz_node(node, qlm);
-	else
+		mode = cvmx_qlm_get_mode_cn78xx(node, qlm);
+	} else {
 		gbaud = cvmx_qlm_get_gbaud_mhz(qlm);
+		mode = cvmx_qlm_get_mode(qlm);
+	} 
 
 	/* Apply RX Equalization for speed >= 8G */
 	if (qlm < 8) {
 		if (gbaud < 6250)
 			return 0;
-	} else { // OCI
-		gserx_spd.u64 = cvmx_read_csr_node(node, CVMX_GSERX_SPD(qlm));
-		/* Supported with SW init at 6.25G */
-		if (gserx_spd.s.spd == 0xf) {
-			if (gbaud < 6250)
-				return 0;
-		} else { /* Only supported at 8G or higher */
-			if (gbaud < 8000)
-				return 0;
-		}
 	}
 
 	/* Don't run on PCIe Links */
-	if (OCTEON_IS_MODEL(OCTEON_CN78XX))
-		mode = cvmx_qlm_get_mode_cn78xx(node, qlm);
-	else
-	mode = cvmx_qlm_get_mode(qlm);
 	if (mode == CVMX_QLM_MODE_PCIE
 	    || mode == CVMX_QLM_MODE_PCIE_1X8
 	    || mode == CVMX_QLM_MODE_PCIE_1X2
@@ -2188,13 +2207,61 @@ int __cvmx_qlm_rx_equalization(int node, int qlm, int lane)
 
 	fail = 0;
 
-	for (l = 0; l < max_lanes; l++) {
-		cvmx_gserx_br_rxx_ctl_t rxx_ctl;
-		cvmx_gserx_br_rxx_eer_t rxx_eer;
+	/* Before completing Rx equalization wait for GSERx_RX_EIE_DETSTS[CDRLOCK] to be set
+	   This ensures the rx data is valid */
+	if (lane == -1) {
+		/* check all 4 Lanes (cdrlock = 1111/b) for CDR Lock with lane == -1 */
+		if (CVMX_WAIT_FOR_FIELD64_NODE(node, CVMX_GSERX_RX_EIE_DETSTS(qlm),
+				cvmx_gserx_rx_eie_detsts_t, cdrlock, ==, (1<<max_lanes) - 1, 500)) {
+#ifdef DEBUG_QLM
+			eie_detsts.u64 = cvmx_read_csr_node(node, CVMX_GSERX_RX_EIE_DETSTS(qlm));
+			cvmx_dprintf("ERROR: %d:QLM%d: CDR Lock not detected for all 4 lanes. CDR_LOCK(0x%x)\n", node, qlm, eie_detsts.s.cdrlock);
+#endif
+			return -1;
+		}
+	} else {
+		if (CVMX_WAIT_FOR_FIELD64_NODE(node, CVMX_GSERX_RX_EIE_DETSTS(qlm),
+				cvmx_gserx_rx_eie_detsts_t, cdrlock, &,  (1 << lane), 500)) {
+#ifdef DEBUG_QLM
+			eie_detsts.u64 = cvmx_read_csr_node(node, CVMX_GSERX_RX_EIE_DETSTS(qlm));
+			cvmx_dprintf("ERROR: %d:QLM%d: CDR Lock not detected for Lane%d CDR_LOCK(0x%x)\n", node, qlm, lane, eie_detsts.s.cdrlock);
+#endif
+			return -1;
+		}
+	}
 
+	/* Errata (GSER-20075) GSER(0..13)_BR_RX3_EER[RXT_ERR] is
+	   GSER(0..13)_BR_RX2_EER[RXT_ERR]. Since lanes 2-3 trigger at the same
+	   time, we need to setup lane 3 before we loop through the lanes */
+	if (OCTEON_IS_MODEL(OCTEON_CN78XX_PASS1_X)
+	    && ((lane == -1) || (lane == 3))) {
+		/* Enable software control */
+		rxx_ctl.u64 = cvmx_read_csr_node(node, CVMX_GSERX_BR_RXX_CTL(3, qlm));
+		rxx_ctl.s.rxt_swm = 1;
+		cvmx_write_csr_node(node, CVMX_GSERX_BR_RXX_CTL(3, qlm), rxx_ctl.u64);
+
+		/* Clear the completion flag */
+		rxx_eer.u64 = cvmx_read_csr_node(node, CVMX_GSERX_BR_RXX_EER(3, qlm));
+		rxx_eer.s.rxt_esv = 0;
+		cvmx_write_csr_node(node, CVMX_GSERX_BR_RXX_EER(3, qlm), rxx_eer.u64);
+		/* Initiate a new request on lane 2 */
+		if (lane == 3) {
+			rxx_eer.u64 = cvmx_read_csr_node(node, CVMX_GSERX_BR_RXX_EER(2, qlm));
+			rxx_eer.s.rxt_eer = 1;
+			cvmx_write_csr_node(node, CVMX_GSERX_BR_RXX_EER(2, qlm), rxx_eer.u64);
+		}
+	}
+
+	for (l = 0; l < max_lanes; l++) {
 		if ((lane != -1) && (lane != l))
 			continue;
 
+		/* Skip lane 3 on 78p1.x due to Errata (GSER-20075). Handled above */
+		if (OCTEON_IS_MODEL(OCTEON_CN78XX_PASS1_X) && (l == 3)) {
+			/* Need to add lane 3 to pending list for 78xx pass 1.x */
+			pending |= 1 << 3;		  
+			continue;
+		}
 		/* Enable software control */
 		rxx_ctl.u64 = cvmx_read_csr_node(node, CVMX_GSERX_BR_RXX_CTL(l, qlm));
 		rxx_ctl.s.rxt_swm = 1;
@@ -2205,30 +2272,183 @@ int __cvmx_qlm_rx_equalization(int node, int qlm, int lane)
 		rxx_eer.s.rxt_esv = 0;
 		rxx_eer.s.rxt_eer = 1;
 		cvmx_write_csr_node(node, CVMX_GSERX_BR_RXX_EER(l, qlm), rxx_eer.u64);
+		pending |= 1 << l;
 	}
 
+	/* Wait for 250ms, approx 10x times measured value, as XFI/XLAUI
+	   can take 21-23ms, other interfaces can take 2-3ms.  */
+        timeout = cvmx_clock_get_count(CVMX_CLOCK_CORE) + 2500000 *
+			cvmx_clock_get_rate(CVMX_CLOCK_CORE) / 1000000;
+
+	lane_mask = 0;
+	while (pending) {
 	/* Wait for RX equalization to complete */
 	for (l = 0; l < max_lanes; l++) {
-		cvmx_gserx_br_rxx_eer_t rxx_eer;
-		cvmx_gserx_br_rxx_ctl_t rxx_ctl;
+			lane_mask = 1 << l;
+			/* Only check lanes that are pending */
+			if (!(pending & lane_mask))
+				continue;
+			/* Read the registers for checking Electrical Idle/CDR
+			 * lock and the status of the RX equalization */
+			eie_detsts.u64 = cvmx_read_csr_node(node, CVMX_GSERX_RX_EIE_DETSTS(qlm));
+			rxx_eer.u64 = cvmx_read_csr_node(node, CVMX_GSERX_BR_RXX_EER(l, qlm));
+			/* Mark failure if lane entered Electrical Idle or lost
+			 * CDR Lock. The bit for the lane will have cleared in
+			 * either EIESTS or CDRLOCK */	
+			if (!(eie_detsts.s.eiests & eie_detsts.s.cdrlock & lane_mask)) {
+				fail |= lane_mask;
+				pending &= ~lane_mask;
+			}
+			else if (rxx_eer.s.rxt_esv)
+				pending &= ~lane_mask;
+		}
+		/* Breakout of the loop on timeout */
+		if (cvmx_clock_get_count(CVMX_CLOCK_CORE) > timeout)
+			break;
+	}
 
+	lane_mask = 0;
+	/* Cleanup and report status */
+	for (l = 0; l < max_lanes; l++) {
 		if ((lane != -1) && (lane != l))
 			continue;
-
-		CVMX_WAIT_FOR_FIELD64_NODE(node, CVMX_GSERX_BR_RXX_EER(l, qlm),
-				cvmx_gserx_br_rxx_eer_t, rxt_esv, ==, 1, 1000000);
+		lane_mask = 1 << l;
 		rxx_eer.u64 = cvmx_read_csr_node(node, CVMX_GSERX_BR_RXX_EER(l, qlm));
 		/* Switch back to hardware control */
 		rxx_ctl.u64 = cvmx_read_csr_node(node, CVMX_GSERX_BR_RXX_CTL(l, qlm));
 		rxx_ctl.s.rxt_swm = 0;
 		cvmx_write_csr_node(node, CVMX_GSERX_BR_RXX_CTL(l, qlm), rxx_ctl.u64);
-		if (!rxx_eer.s.rxt_esv) {
-			//cvmx_dprintf("%d:QLM%d: Lane %d RX equalization timeout\n", node, qlm, lane);
-			fail = 1;
+
+		/* Report status */
+		if (fail & lane_mask) {
+#ifdef DEBUG_QLM
+			cvmx_dprintf("%d:QLM%d: Lane%d RX equalization lost CDR Lock or entered Electrical Idle\n", node, qlm, l);
+#endif
+		} else if ((pending & lane_mask) || !rxx_eer.s.rxt_esv) {
+#ifdef DEBUG_QLM
+			cvmx_dprintf("%d:QLM%d: Lane %d RX equalization timeout\n", node, qlm, l);
+#endif
+			fail |= 1 << l;
+		} else {
+#ifdef DEBUG_QLM
+			char *dir_label[4] = {"Hold", "Inc", "Dec", "Hold"};
+# ifdef DEBUG_QLM_RX
+			cvmx_gserx_lanex_rx_aeq_out_0_t rx_aeq_out_0;
+			cvmx_gserx_lanex_rx_aeq_out_1_t rx_aeq_out_1;
+			cvmx_gserx_lanex_rx_aeq_out_2_t rx_aeq_out_2;
+			cvmx_gserx_lanex_rx_vma_status_0_t rx_vma_status_0;
+# endif
+			cvmx_dprintf("%d:QLM%d: Lane%d: RX equalization completed.\n",
+				node, qlm, l);
+			cvmx_dprintf("    Tx Direction Hints TXPRE: %s, TXMAIN: %s, TXPOST: %s, Figure of Merit: %d\n",
+				dir_label[(rxx_eer.s.rxt_esm) & 0x3],
+				dir_label[((rxx_eer.s.rxt_esm) >> 2) & 0x3],
+				dir_label[((rxx_eer.s.rxt_esm) >> 4) & 0x3],
+				rxx_eer.s.rxt_esm >> 6);
+
+# ifdef DEBUG_QLM_RX
+
+			rx_aeq_out_0.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANEX_RX_AEQ_OUT_0(l, qlm));
+			rx_aeq_out_1.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANEX_RX_AEQ_OUT_1(l, qlm));
+			rx_aeq_out_2.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANEX_RX_AEQ_OUT_2(l, qlm));
+			rx_vma_status_0.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANEX_RX_VMA_STATUS_0(l, qlm));                                     
+			cvmx_dprintf("    DFE Tap1:%lu, Tap2:%ld, Tap3:%ld, Tap4:%ld, Tap5:%ld\n",
+					cvmx_bit_extract(rx_aeq_out_1.u64, 0, 5),
+					cvmx_bit_extract_smag(rx_aeq_out_1.u64, 5, 9),
+					cvmx_bit_extract_smag(rx_aeq_out_1.u64, 10, 14),
+					cvmx_bit_extract_smag(rx_aeq_out_0.u64, 0, 4),
+					cvmx_bit_extract_smag(rx_aeq_out_0.u64, 5, 9));
+			cvmx_dprintf("    Pre-CTLE Gain:%lu, Post-CTLE Gain:%lu, CTLE Peak:%lu, CTLE Pole:%lu\n",
+					cvmx_bit_extract(rx_aeq_out_2.u64, 4, 4),
+					cvmx_bit_extract(rx_aeq_out_2.u64, 0, 4),
+					cvmx_bit_extract(rx_vma_status_0.u64, 2, 4),
+					cvmx_bit_extract(rx_vma_status_0.u64, 0, 2));
+# endif
+#endif
 		}
 	}
 
 	return (fail) ? -1 : 0;
+}
+
+/**
+ * Errata GSER-27882 -GSER 10GBASE-KR Transmit Equalizer
+ * Training may not update PHY Tx Taps. This function is not static
+ * so we can share it with BGX KR
+ *
+ * @param node	Node to apply errata workaround
+ * @param qlm	QLM to apply errata workaround
+ * @param lane	Lane to apply the errata
+ */
+int cvmx_qlm_gser_errata_27882(int node, int qlm, int lane)
+{
+	cvmx_gserx_lanex_pcs_ctlifc_0_t clifc0;
+	cvmx_gserx_lanex_pcs_ctlifc_2_t clifc2;
+
+	if (!(OCTEON_IS_MODEL(OCTEON_CN73XX_PASS1_0)
+	      || OCTEON_IS_MODEL(OCTEON_CN73XX_PASS1_1)
+	      || OCTEON_IS_MODEL(OCTEON_CN73XX_PASS1_2)
+	      || OCTEON_IS_MODEL(OCTEON_CNF75XX_PASS1_0)
+	      || OCTEON_IS_MODEL(OCTEON_CN78XX)))
+		return 0;
+
+	if (CVMX_WAIT_FOR_FIELD64_NODE(node, CVMX_GSERX_RX_EIE_DETSTS(qlm),
+		cvmx_gserx_rx_eie_detsts_t, cdrlock, &,  (1 << lane), 200)) {
+		//cvmx_dprintf("ERROR: %d:QLM%d: CDR Lock not detected for Lane%d\n", node, qlm, lane);
+		return -1;
+	}
+
+	clifc0.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANEX_PCS_CTLIFC_0(lane, qlm));
+	clifc0.s.cfg_tx_coeff_req_ovrrd_val = 1;
+	cvmx_write_csr_node(node, CVMX_GSERX_LANEX_PCS_CTLIFC_0(lane, qlm), clifc0.u64);
+	clifc2.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANEX_PCS_CTLIFC_2(lane, qlm));
+	clifc2.s.cfg_tx_coeff_req_ovrrd_en = 1;
+	cvmx_write_csr_node(node, CVMX_GSERX_LANEX_PCS_CTLIFC_2(lane, qlm), clifc2.u64);
+	clifc2.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANEX_PCS_CTLIFC_2(lane, qlm));
+	clifc2.s.ctlifc_ovrrd_req = 1;
+	cvmx_write_csr_node(node, CVMX_GSERX_LANEX_PCS_CTLIFC_2(lane, qlm), clifc2.u64);
+	clifc2.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANEX_PCS_CTLIFC_2(lane, qlm));
+	clifc2.s.cfg_tx_coeff_req_ovrrd_en = 0;
+	cvmx_write_csr_node(node, CVMX_GSERX_LANEX_PCS_CTLIFC_2(lane, qlm), clifc2.u64);
+	clifc2.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANEX_PCS_CTLIFC_2(lane, qlm));
+	clifc2.s.ctlifc_ovrrd_req = 1;
+	cvmx_write_csr_node(node, CVMX_GSERX_LANEX_PCS_CTLIFC_2(lane, qlm), clifc2.u64);
+	return 0;
+}
+
+/**
+ * Updates the RX EQ Default Settings Update (CTLE Bias) to support longer SERDES channels
+ *
+ * @INTERNAL
+ *
+ * @param node	Node number to configure
+ * @param qlm	QLM number to configure
+ */
+void cvmx_qlm_gser_errata_25992(int node, int qlm)
+{
+	int lane;
+	int num_lanes = cvmx_qlm_get_lanes(qlm);
+
+	if (!(OCTEON_IS_MODEL(OCTEON_CN73XX_PASS1_0)
+	      || OCTEON_IS_MODEL(OCTEON_CN73XX_PASS1_1)
+	      || OCTEON_IS_MODEL(OCTEON_CN73XX_PASS1_2)
+	      || OCTEON_IS_MODEL(OCTEON_CN78XX_PASS1_X)))
+		return;
+
+	for (lane = 0; lane < num_lanes; lane++) {
+
+		cvmx_gserx_lanex_rx_ctle_ctrl_t rx_ctle_ctrl;
+		cvmx_gserx_lanex_rx_cfg_4_t rx_cfg_4;
+
+		rx_ctle_ctrl.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANEX_RX_CTLE_CTRL(lane, qlm));
+		rx_ctle_ctrl.s.pcs_sds_rx_ctle_bias_ctrl = 3;
+		cvmx_write_csr_node(node, CVMX_GSERX_LANEX_RX_CTLE_CTRL(lane, qlm), rx_ctle_ctrl.u64);
+
+		rx_cfg_4.u64 = cvmx_read_csr_node(node, CVMX_GSERX_LANEX_RX_CFG_4(lane, qlm));
+		rx_cfg_4.s.cfg_rx_errdet_ctrl = 0xcd6f;
+		cvmx_write_csr_node(node, CVMX_GSERX_LANEX_RX_CFG_4(lane, qlm), rx_cfg_4.u64);
+
+	}
 }
 
 void cvmx_qlm_display_registers(int qlm)

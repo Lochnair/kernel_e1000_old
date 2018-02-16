@@ -44,7 +44,7 @@
  * Scratch memory is byte addressable - all addresses are byte addresses.
  *
  *
- * <hr>$Revision: 73845 $<hr>
+ * <hr>$Revision: 135592 $<hr>
  *
  *
  */
@@ -61,6 +61,11 @@ extern "C" {
 /* Note: This define must be a long, not a long long in order to compile
         without warnings for both 32bit and 64bit. */
 #define CVMX_SCRATCH_BASE       (-32768l)	/* 0xffffffffffff8000 */
+
+/* Scratch line for LMTST/LMTDMA on Octeon3 models */
+#ifdef CVMX_CAVIUM_OCTEON3
+#define CVMX_PKO_LMTLINE 2ull
+#endif
 
 /**
  * Reads an 8 bit value from the processor local scratchpad memory.

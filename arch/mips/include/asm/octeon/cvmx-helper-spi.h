@@ -43,10 +43,18 @@
  * Functions for SPI initialization, configuration,
  * and monitoring.
  *
- * <hr>$Revision: 78888 $<hr>
+ * <hr>$Revision: 137666 $<hr>
  */
 #ifndef __CVMX_HELPER_SPI_H__
 #define __CVMX_HELPER_SPI_H__
+
+#include "cvmx-helper.h"
+
+#ifdef	__cplusplus
+/* *INDENT-OFF* */
+extern "C" {
+/* *INDENT-ON* */
+#endif
 
 /**
  * @INTERNAL
@@ -106,5 +114,11 @@ extern int __cvmx_helper_spi_link_set(int ipd_port, cvmx_helper_link_info_t link
  * @param timeout value
  */
 void cvmx_spi_config_set_timeout(int timeout);
+
+#ifdef	__cplusplus
+/* *INDENT-OFF* */
+}
+/* *INDENT-ON* */
+#endif
 
 #endif

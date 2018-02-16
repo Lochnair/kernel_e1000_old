@@ -681,10 +681,14 @@ cvmx_nand_status_t cvmx_nand_initialize(cvmx_nand_initialize_flags_t flags,
 
 	/* Clear the interrupt state */
 	cvmx_write_csr(CVMX_NDF_INT, cvmx_read_csr(CVMX_NDF_INT));
+	if (OCTEON_IS_MODEL(OCTEON_CN73XX) || OCTEON_IS_MODEL(OCTEON_CNF75XX))
+		cvmx_write_csr(CVMX_NDF_INT_W1S, 0);
+	else {
 	cvmx_write_csr(CVMX_NDF_INT_EN, 0);
 	cvmx_write_csr(CVMX_MIO_NDF_DMA_INT,
 		       cvmx_read_csr(CVMX_MIO_NDF_DMA_INT));
 	cvmx_write_csr(CVMX_MIO_NDF_DMA_INT_EN, 0);
+	}
 
 	/* The simulator crashes if you access non existant devices. Assume
 	   only chip select 1 is connected to NAND */
@@ -1371,13 +1375,29 @@ static inline void __cvmx_nand_setup_dma(int chip, int is_write,
 					 uint64_t buffer_address,
 					 int buffer_length)
 {
-	union cvmx_mio_ndf_dma_cfg ndf_dma_cfg;
 	CVMX_NAND_LOG_CALLED();
 	CVMX_NAND_LOG_PARAM("%d", chip);
 	CVMX_NAND_LOG_PARAM("%d", is_write);
 	CVMX_NAND_LOG_PARAM("0x%llx", CAST_ULL(buffer_address));
 	CVMX_NAND_LOG_PARAM("%d", buffer_length);
 
+	if (OCTEON_IS_MODEL(OCTEON_CN73XX)
+	    || OCTEON_IS_MODEL(OCTEON_CNF75XX)) {
+		union cvmx_ndf_dma_cfg ndf_dma_cfg;
+		union cvmx_ndf_dma_adr ndf_dma_adr;
+		ndf_dma_cfg.u64 = 0;
+		ndf_dma_cfg.s.en = 1;
+		/* is_write - one means DMA reads from memory and writes to flash */
+		ndf_dma_cfg.s.rw = is_write;
+		ndf_dma_cfg.s.clr = 0;
+		ndf_dma_cfg.s.size = ((buffer_length + 7) >> 3) - 1;
+		ndf_dma_adr.u64 = 0;
+		ndf_dma_adr.s.adr = (buffer_address >> 3);
+		CVMX_SYNCWS;
+		cvmx_write_csr(CVMX_NDF_DMA_ADR, ndf_dma_adr.u64);
+		cvmx_write_csr(CVMX_NDF_DMA_CFG, ndf_dma_cfg.u64);
+	} else {
+		union cvmx_mio_ndf_dma_cfg ndf_dma_cfg;
 	ndf_dma_cfg.u64 = 0;
 	ndf_dma_cfg.s.en = 1;
 	/* is_write - one means DMA reads from memory and writes to flash */
@@ -1387,6 +1407,7 @@ static inline void __cvmx_nand_setup_dma(int chip, int is_write,
 	ndf_dma_cfg.s.adr = buffer_address;
 	CVMX_SYNCWS;
 	cvmx_write_csr(CVMX_MIO_NDF_DMA_CFG, ndf_dma_cfg.u64);
+	}
 
 	CVMX_NAND_RETURN_NOTHING();
 }
@@ -1448,7 +1469,6 @@ static inline int __cvmx_nand_low_level_read(int chip,
 					     int buffer_length)
 {
 	cvmx_nand_cmd_t cmd;
-	union cvmx_mio_ndf_dma_cfg ndf_dma_cfg;
 	int bytes;
 	int nand_selected;
 	int status = CVMX_NAND_ERROR;
@@ -1529,6 +1549,22 @@ static inline int __cvmx_nand_low_level_read(int chip,
 
 	WATCHDOG_RESET();
 
+	if (OCTEON_IS_MODEL(OCTEON_CN73XX)
+	    || OCTEON_IS_MODEL(OCTEON_CNF75XX)) {
+		union cvmx_ndf_dma_adr ndf_dma_adr;
+		/* Wait for the DMA to complete */
+		if (CVMX_WAIT_FOR_FIELD64(CVMX_NDF_DMA_CFG,
+				  union cvmx_ndf_dma_cfg,
+				  en, ==, 0, NAND_TIMEOUT_USECS_READ)) {
+			WATCHDOG_RESET();
+			status = CVMX_NAND_TIMEOUT;
+			goto error;
+		}
+		/* Return the number of bytes transfered */
+		ndf_dma_adr.u64 = cvmx_read_csr(CVMX_NDF_DMA_ADR);
+		bytes = (ndf_dma_adr.s.adr << 3) - buffer_address;
+	} else {
+		union cvmx_mio_ndf_dma_cfg ndf_dma_cfg;
 	/* Wait for the DMA to complete */
 	if (CVMX_WAIT_FOR_FIELD64(CVMX_MIO_NDF_DMA_CFG,
 				  union cvmx_mio_ndf_dma_cfg,
@@ -1540,6 +1576,7 @@ static inline int __cvmx_nand_low_level_read(int chip,
 	/* Return the number of bytes transfered */
 	ndf_dma_cfg.u64 = cvmx_read_csr(CVMX_MIO_NDF_DMA_CFG);
 	bytes = ndf_dma_cfg.s.adr - buffer_address;
+	}
 
 	if (cvmx_unlikely(cvmx_nand_flags & CVMX_NAND_INITIALIZE_FLAGS_DEBUG))
 		__cvmx_nand_hex_dump(buffer_address, bytes);
@@ -1760,12 +1797,23 @@ cvmx_nand_status_t cvmx_nand_page_write(int chip, uint64_t nand_address,
 
 	/* Wait for the DMA to complete */
 	WATCHDOG_RESET();
+	if (OCTEON_IS_MODEL(OCTEON_CN73XX)
+	    || OCTEON_IS_MODEL(OCTEON_CNF75XX)) {
+		if (CVMX_WAIT_FOR_FIELD64(CVMX_NDF_DMA_CFG,
+				  union cvmx_ndf_dma_cfg, en, ==, 0,
+				  NAND_TIMEOUT_USECS_WRITE)) {
+			WATCHDOG_RESET();
+			status = CVMX_NAND_TIMEOUT;
+			goto done;
+		}
+	} else {
 	if (CVMX_WAIT_FOR_FIELD64(CVMX_MIO_NDF_DMA_CFG,
 				  union cvmx_mio_ndf_dma_cfg, en, ==, 0,
 				  NAND_TIMEOUT_USECS_WRITE)) {
 		WATCHDOG_RESET();
 		status = CVMX_NAND_TIMEOUT;
 		goto done;
+	}
 	}
 		
 	/* Data transfer is done but NDF is not, it is waiting for R/B# */
@@ -2063,12 +2111,23 @@ cvmx_nand_status_t cvmx_nand_set_feature(int chip, uint8_t feat_num,
 	if (status)
 		goto done;
 
+	if (OCTEON_IS_MODEL(OCTEON_CN73XX)
+	    || OCTEON_IS_MODEL(OCTEON_CNF75XX)) {
+		if (CVMX_WAIT_FOR_FIELD64(CVMX_NDF_DMA_CFG,
+				  union cvmx_ndf_dma_cfg, en, ==, 0,
+				  NAND_TIMEOUT_USECS_WRITE)) {
+			WATCHDOG_RESET();
+			status = CVMX_NAND_TIMEOUT;
+			goto done;
+		}
+	} else {
 	if (CVMX_WAIT_FOR_FIELD64(CVMX_MIO_NDF_DMA_CFG,
 				  union cvmx_mio_ndf_dma_cfg, en, ==, 0,
 				  NAND_TIMEOUT_USECS_WRITE)) {
 		WATCHDOG_RESET();
 		status = CVMX_NAND_TIMEOUT;
 		goto done;
+	}
 	}
 done:
 	__cvmx_nand_select(nand_selected);

@@ -156,13 +156,14 @@ static struct dtx_reg_addr_rule dtx_regs_73xx[] = {
 	{HNA,		0x00011800FE238000ull,	0,		8},
 	{IOBN,		0x00011800FE780000ull,	0,		8},
 	{IOBP,		0x00011800FE7A0000ull,	0,		8},
+	{KEY,		0x00011800FE100000ull,	0,		8},
 	{L2C_CBC,	0x00011800FE420000ull,	0x8000,		8},
 	{L2C_MCI,	0x00011800FE2E0000ull,	0x8000,		8},
 	{L2C_TAD,	0x00011800FE240000ull,	0x8000,		8},
 	{LBK,		0x00011800FE090000ull,	0,		8},
 	{LMC,		0x00011800FE440000ull,	0x8000,		8},
 	{MIO,		0x00011800FE000000ull,	0,		8},
-	{OSM,		0x00011800FE6E0000ull,	0,		8},
+	{OSM,		0x00011800FEEE0000ull,	0,		8},
 	{PEM,		0x00011800FE600000ull,	0x8000,		8},
 	{PKI_PBE,	0x00011800FE228000ull,	0,		8},
 	{PKI_PFE,	0x00011800FE220000ull,	0,		8},
@@ -176,9 +177,67 @@ static struct dtx_reg_addr_rule dtx_regs_73xx[] = {
 	{SPEM,		0x00011800FE600000ull,	0,		8},
 	{SSO,		0x00011800FEB38000ull,	0,		8},
 	{TIM,		0x00011800FE2C0000ull,	0,		8},
-	{USBDRD,	0x00011800FE340000ull,	0,		8},
+	{USBDRD,	0x00011800FE340000ull,	0x8000,		8},
 	{XCV,		0x00011800FE6D8000ull,	0,		8},
 	{ZIP,		0x00011800FE1C0000ull,	0,		8},
+	{INVALID_BLOCK_ID, 0,			0,		0}
+};
+
+/* DTX registers on the 75xx */
+static struct dtx_reg_addr_rule dtx_regs_75xx[] = {
+	{BBX1I,		0x00011800FED78000ull,	0,		8},
+	{BBX2I,		0x00011800FED80000ull,	0,		8},
+	{BBX3I,		0X00011800FED88000ull,	0,		8},
+	{BCH,		0x00011800FE388000ull,	0,		8},
+	{BGX,		0x00011800FE700000ull,	0x8000,		8},
+	{BTS,		0x00011800FE5B0000ULL,	0,		8},
+	{CIU,		0x00011800FE808000ull,	0,		8},
+	{DENC,		0x00011800FED48000ull,	0,		8},
+	{DLFE,		0x00011800FED18000ull,	0,		8},
+	{DPI,		0x00011800FEEF8000ull,	0,		8},
+	{FDEQ,		0x00011800FED30000ull,	0x20000,	8},
+	{FPA,		0x00011800FE940000ull,	0,		8},
+	{GSER,		0x00011800FE480000ull,	0x8000,		8},
+	{IOBN,		0x00011800FE780000ull,	0,		8},
+	{IOBP,		0x00011800FE7A0000ull,	0,		8},
+	{KEY,		0x00011800FE100000ull,	0,		8},
+	{L2C_CBC,	0x00011800FE420000ull,	0x8000,		8},
+	{L2C_MCI,	0x00011800FE2E0000ull,	0x8000,		8},
+	{L2C_TAD,	0x00011800FE240000ull,	0x8000,		8},
+	{LBK,		0x00011800FE090000ull,	0,		8},
+	{LMC,		0x00011800FE440000ull,	0x8000,		8},
+	{MDB,		0x00011800FEC00000ull,	0x8000,		8},
+	{MHBW,		0x00011800FE598000ull,	0,		8},
+	{MIO,		0x00011800FE000000ull,	0,		8},
+	{PEM,		0x00011800FE600000ull,	0x8000,		8},
+	{PKI_PBE,	0x00011800FE228000ull,	0,		8},
+	{PKI_PFE,	0x00011800FE220000ull,	0,		8},
+	{PKI_PIX,	0x00011800FE230000ull,	0,		8},
+	{PKO,		0x00011800FEAA0000ull,	0,		8},
+	{PNB,		0x00011800FE580000ull,	0x8000,		8},
+	{PNBD,		0x00011800FED90000ull,	0x8000,		8},
+	{PRCH,		0x00011800FED00000ull,	0,		8},
+	{PSM,		0x00011800FEEA0000ull,	0,		8},
+	{RDEC,		0x00011800FED68000ull,	0,		8},
+	{RFIF,		0x00011800FE6A8000ull,	0,		8},
+	{RMAP,		0x00011800FED40000ull,	0,		8},
+	{RNM,		0x00011800FE200000ull,	0,		8},
+	{RST,		0x00011800FE030000ull,	0,		8},
+	{SLI,		0x00011800FE8F8000ull,	0,		8},
+	{SRIO,		0x00011800FE640000ull,	0x8000,		8},
+	{SSO,		0x00011800FEB38000ull,	0,		8},
+	{TDEC,		0x00011800FED60000ull,	0,		8},
+	{TIM,		0x00011800FE2C0000ull,	0,		8},
+	{ULFE,		0x00011800FED08000ull,	0,		8},
+	{USBDRD,	0x00011800FE340000ull,	0,		8},
+	{VDEC,		0x00011800FED70000ull,	0,		8},
+	{WPSE,		0x00011800FED10000ull,	0,		8},
+	{WRCE,		0x00011800FED38000ull,	0,		8},
+	{WRDE,		0x00011800FED58000ull,	0,		8},
+	{WRSE,		0x00011800FED28000ull,	0,		8},
+	{WTXE,		0x00011800FED20000ull,	0,		8},
+	{XCV,		0x00011800FE6D8000ull,	0,		8},
+	{XSX,		0x00011800FE5A8000ull,	0,		8},
 	{INVALID_BLOCK_ID, 0,			0,		0}
 };
 
@@ -212,6 +271,8 @@ static uint64_t cvmx_get_dtx_reg_addr(cvmx_dtx_id_t	block_id,
 		regs = dtx_regs_70xx;
 	else if (OCTEON_IS_MODEL(OCTEON_CN73XX))
 		regs = dtx_regs_73xx;
+	else if (OCTEON_IS_MODEL(OCTEON_CNF75XX))
+		regs = dtx_regs_75xx;
 
 	while ((block_id != regs->id) && (regs->id != INVALID_BLOCK_ID))
 		regs++;
@@ -372,6 +433,9 @@ int cvmx_ocla_reset(int	node,
 	sft_rst.u64 = 0;
 	sft_rst.s.reset = 1;
 	cvmx_write_csr_node(node, CVMX_OCLAX_SFT_RST(ix), sft_rst.u64);
+	do {
+		sft_rst.u64 = cvmx_read_csr_node(node, CVMX_OCLAX_SFT_RST(ix));
+	} while (sft_rst.s.reset == 1);
 
 	/* Clear registers */
 	cvmx_write_csr_node(node, CVMX_OCLAX_GEN_CTL(ix), 0);
@@ -386,6 +450,7 @@ int cvmx_ocla_reset(int	node,
 	state_int.s.fsm0_int = 1;
 	state_int.s.fsm1_int = 1;
 	state_int.s.trigfull = 1;
+	state_int.s.captured = 1;
 	cvmx_write_csr_node(node, CVMX_OCLAX_STATE_INT(ix), state_int.u64);
 
 	/* Enable ocla */
@@ -420,6 +485,7 @@ int cvmx_ocla_clear_interrupts(int	node,
 	state_int.s.fsm0_int = 1;
 	state_int.s.fsm1_int = 1;
 	state_int.s.trigfull = 1;
+	state_int.s.captured = 1;
 	cvmx_write_csr_node(node, CVMX_OCLAX_STATE_INT(ix), state_int.u64);
 
 	return 0;
@@ -657,6 +723,8 @@ int cvmx_fsm_init(int			node,
 	fsm_or.u64 = 0;
 
 	/* To disable an input the input and its complement must be set to 1 */
+	fsm_and.s.trig 		= 1;
+	fsm_and_i.s.trig 	= 1;
 	fsm_and.s.mcd 		= ~mcd->msk;
 	fsm_and_i.s.mcd 	= ~mcd->msk;
 	fsm_and.s.match		= ~matcher->msk;
@@ -685,7 +753,11 @@ int cvmx_fsm_init(int			node,
 		       fsm_and_i.u64);
 
 	/* The OR term determines the new state */
+	if (IS_OCLA_REV1)
 	fsm_or.s.or_state = and_term;
+	else
+		fsm_or.s.or_state = 1 << and_term;
+
 	cvmx_write_csr_node(node, CVMX_OCLAX_FSMX_ORX(ix, fsm, new_st),
 			    fsm_or.u64);
 
@@ -761,8 +833,10 @@ int cvmx_fsm_state_set(int			node,
 	/* Set the action for the new state */
 	fsm_state.u64 = cvmx_read_csr_node(node, CVMX_OCLAX_FSMX_STATEX(ix, fsm,
 									state));
-	if (action & ACTION_CAP)
+	if (action & ACTION_CAP) {
 		fsm_state.s.cap = 1;
+		fsm_state.s.set_trig = 1;
+	}
 	if (action & ACTION_INT)
 		fsm_state.s.set_int = 1;
 

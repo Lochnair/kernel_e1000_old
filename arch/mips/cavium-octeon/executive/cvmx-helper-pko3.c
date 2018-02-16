@@ -1007,10 +1007,8 @@ int cvmx_helper_pko3_init_interface(int xiface)
 	fcs_enable = __cvmx_helper_get_has_fcs(xiface);
 	pad_enable = __cvmx_helper_get_pko_padding(xiface);
 
-	// XXX for some reason, turning off BGX FCS does not work on o75/o73
-	if (OCTEON_IS_MODEL(OCTEON_CN78XX_PASS1_X) ||
-	    OCTEON_IS_MODEL(OCTEON_CNF75XX) ||
-	    OCTEON_IS_MODEL(OCTEON_CN73XX))
+	/* Do not use PKO PAD/FCS generation on o78p1.x on BGX interfaces */
+	if (OCTEON_IS_MODEL(OCTEON_CN78XX_PASS1_X))
 		pad_enable_pko = false;
 	else
 		pad_enable_pko = pad_enable;

@@ -52,7 +52,6 @@
 
 enum {
 	AHCI_PCI_BAR_STA2X11	= 0,
-	AHCI_PCI_BAR_CAVIUM	= 0,
 	AHCI_PCI_BAR_ENMOTUS	= 2,
 	AHCI_PCI_BAR_STANDARD	= 5,
 };
@@ -74,7 +73,6 @@ enum board_ids {
 	board_ahci_sb600,
 	board_ahci_sb700,	/* for SB700 and SB800 */
 	board_ahci_vt8251,
-	board_ahci_cavium,
 
 	/* aliases */
 	board_ahci_mcp_linux	= board_ahci_mcp65,
@@ -204,13 +202,6 @@ static const struct ata_port_info ahci_port_info[] = {
 		.udma_mask	= ATA_UDMA6,
 		.port_ops	= &ahci_vt8251_ops,
 	},
-	[board_ahci_cavium] = {
-		AHCI_HFLAGS	(AHCI_HFLAG_MSIX | AHCI_HFLAG_NO_MSI),
-		.flags		= AHCI_FLAG_COMMON,
-		.pio_mask	= ATA_PIO4,
-		.udma_mask	= ATA_UDMA6,
-		.port_ops	= &ahci_ops,
-	},
 };
 
 static const struct pci_device_id ahci_pci_tbl[] = {
@@ -255,6 +246,26 @@ static const struct pci_device_id ahci_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, 0x3b2b), board_ahci }, /* PCH RAID */
 	{ PCI_VDEVICE(INTEL, 0x3b2c), board_ahci }, /* PCH RAID */
 	{ PCI_VDEVICE(INTEL, 0x3b2f), board_ahci }, /* PCH AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19b0), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19b1), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19b2), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19b3), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19b4), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19b5), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19b6), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19b7), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19bE), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19bF), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19c0), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19c1), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19c2), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19c3), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19c4), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19c5), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19c6), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19c7), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19cE), board_ahci }, /* DNV AHCI */
+	{ PCI_VDEVICE(INTEL, 0x19cF), board_ahci }, /* DNV AHCI */
 	{ PCI_VDEVICE(INTEL, 0x1c02), board_ahci }, /* CPT AHCI */
 	{ PCI_VDEVICE(INTEL, 0x1c03), board_ahci }, /* CPT AHCI */
 	{ PCI_VDEVICE(INTEL, 0x1c04), board_ahci }, /* CPT RAID */
@@ -506,10 +517,6 @@ static const struct pci_device_id ahci_pci_tbl[] = {
 
 	/* Enmotus */
 	{ PCI_DEVICE(0x1c44, 0x8000), board_ahci },
-
-	/* Cavium */
-	{ PCI_DEVICE(0x177d, 0xa01c),
-	  .driver_data = board_ahci_cavium },
 
 	/* Generic, PCI class code for AHCI */
 	{ PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
@@ -1174,27 +1181,8 @@ static inline void ahci_gtf_filter_workaround(struct ata_host *host)
 int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
 			 struct ahci_host_priv *hpriv)
 {
-	int rc, nvec, vec;
+	int rc, nvec;
 
-	if (!(hpriv->flags & AHCI_HFLAG_MSIX))
-		goto msi;
-
-	nvec = pci_msix_vec_count(pdev);
-	if (!nvec)
-		goto msi;
-	hpriv->msix_entries = kcalloc(nvec, sizeof(struct msix_entry),
-			                                   GFP_KERNEL);
-	for (vec = 0; vec < nvec; vec++)
-                hpriv->msix_entries[vec].entry = vec;
-
-	rc = pci_enable_msix(pdev, hpriv->msix_entries, nvec);
-	if (rc < 0)
-		goto msi;
-	
-	pdev->irq = hpriv->msix_entries[0].vector;
-	return nvec;
-
-msi:
 	if (hpriv->flags & AHCI_HFLAG_NO_MSI)
 		goto intx;
 
@@ -1330,8 +1318,6 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		ahci_pci_bar = AHCI_PCI_BAR_STA2X11;
 	else if (pdev->vendor == 0x1c44 && pdev->device == 0x8000)
 		ahci_pci_bar = AHCI_PCI_BAR_ENMOTUS; 
-	else if (pdev->vendor == 0x177d && pdev->device == 0xa01c)
-		ahci_pci_bar = AHCI_PCI_BAR_CAVIUM;
  
 	/* acquire resources */
 	rc = pcim_enable_device(pdev);
@@ -1436,10 +1422,6 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	n_msis = ahci_init_interrupts(pdev, n_ports, hpriv);
 	if (n_msis > 1)
 		hpriv->flags |= AHCI_HFLAG_MULTI_MSI;
-
-	/* Cavium Thunder doesn't have per port MSI-X irq */
-	if (board_id == board_ahci_cavium)
-		hpriv->flags &= ~AHCI_HFLAG_MULTI_MSI;
 
 	host = ata_host_alloc_pinfo(&pdev->dev, ppi, n_ports);
 	if (!host)
