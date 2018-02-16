@@ -82,7 +82,7 @@
  * internal cycle counter to completely eliminate any causes of
  * bus traffic.
  *
- * <hr> $Revision: 114431 $ <hr>
+ * <hr> $Revision: 137666 $ <hr>
  */
 
 #ifndef __CVMX_CMD_QUEUE_H__
@@ -454,7 +454,7 @@ cvmx_cmd_queue_write(cvmx_cmd_queue_id_t queue_id, bool use_locking,
 		ret = __cvmx_cmd_queue_write_raw(queue_id, qptr,
 			cmd_count, cmds);
 	} else {
-		cmd_ptr = cvmx_phys_to_ptr((uint64_t) qptr->base_paddr);
+		cmd_ptr = (uint64_t *)cvmx_phys_to_ptr((uint64_t) qptr->base_paddr);
 		/* Loop easy for compiler to unroll for the likely case */
 		while (cmd_count > 0) {
 			cmd_ptr[ qptr->index ++ ] = *cmds++;
@@ -510,7 +510,7 @@ cvmx_cmd_queue_write2(cvmx_cmd_queue_id_t queue_id, bool use_locking,
 		ret = __cvmx_cmd_queue_write_raw(queue_id, qptr, 2, cmds);
 	} else {
 		/* Likely case to work fast */
-		cmd_ptr = cvmx_phys_to_ptr((uint64_t) qptr->base_paddr);
+		cmd_ptr = (uint64_t *)cvmx_phys_to_ptr((uint64_t) qptr->base_paddr);
 		cmd_ptr += qptr->index;
 		qptr->index += 2;
 		cmd_ptr[0] = cmd1;
@@ -566,7 +566,7 @@ cvmx_cmd_queue_write3(cvmx_cmd_queue_id_t queue_id, bool use_locking,
 		cmds[2] = cmd3;
 		ret = __cvmx_cmd_queue_write_raw(queue_id, qptr, 3, cmds);
 	} else {
-		cmd_ptr = cvmx_phys_to_ptr((uint64_t) qptr->base_paddr);
+		cmd_ptr = (uint64_t *)cvmx_phys_to_ptr((uint64_t) qptr->base_paddr);
 		cmd_ptr += qptr->index;
 		qptr->index += 3;
 		cmd_ptr[0] = cmd1;

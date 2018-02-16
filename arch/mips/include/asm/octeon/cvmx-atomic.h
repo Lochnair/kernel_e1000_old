@@ -42,7 +42,7 @@
  *
  * This file provides atomic operations
  *
- * <hr>$Revision: 106271 $<hr>
+ * <hr>$Revision: 142870 $<hr>
  *
  *
  */
@@ -347,15 +347,19 @@ static inline int64_t cvmx_atomic_fetch_and_add64_nosync(int64_t * ptr, int64_t 
 
 #ifdef CVMX_CAVIUM_OCTEON2
 	{
-		CVMX_PUSH_OCTEON2;
 		if (__builtin_constant_p(incr) && incr == 1) {
-			__asm__ __volatile__("laid  %0,(%2)":"=r"(ret), "+m"(ptr):"r"(ptr):"memory");
+			__asm__ __volatile__(CVMX_PUSH_OCTEON2_STR
+					     "laid  %0,(%2)"
+					     CVMX_POP_OCTEON2_STR:"=r"(ret), "+m"(ptr):"r"(ptr):"memory");
 		} else if (__builtin_constant_p(incr) && incr == -1) {
-			__asm__ __volatile__("ladd  %0,(%2)":"=r"(ret), "+m"(ptr):"r"(ptr):"memory");
+			__asm__ __volatile__(CVMX_PUSH_OCTEON2_STR
+					     "ladd  %0,(%2)"
+					     CVMX_POP_OCTEON2_STR:"=r"(ret), "+m"(ptr):"r"(ptr):"memory");
 		} else {
-			__asm__ __volatile__("laad  %0,(%2),%3":"=r"(ret), "+m"(ptr):"r"(ptr), "r"(incr):"memory");
+			__asm__ __volatile__(CVMX_PUSH_OCTEON2_STR
+					     "laad  %0,(%2),%3"
+					     CVMX_POP_OCTEON2_STR:"=r"(ret), "+m"(ptr):"r"(ptr), "r"(incr):"memory");
 		}
-		CVMX_POP_OCTEON2;
 	}
 #else
 	{
@@ -416,15 +420,19 @@ static inline int32_t cvmx_atomic_fetch_and_add32_nosync(int32_t * ptr, int32_t 
 
 #ifdef CVMX_CAVIUM_OCTEON2
 	{
-		CVMX_PUSH_OCTEON2;
 		if (__builtin_constant_p(incr) && incr == 1) {
-			__asm__ __volatile__("lai  %0,(%2)":"=r"(ret), "+m"(ptr):"r"(ptr):"memory");
+			__asm__ __volatile__(CVMX_PUSH_OCTEON2_STR
+					     "lai  %0,(%2)"
+					     CVMX_POP_OCTEON2_STR:"=r"(ret), "+m"(ptr):"r"(ptr):"memory");
 		} else if (__builtin_constant_p(incr) && incr == -1) {
-			__asm__ __volatile__("lad  %0,(%2)":"=r"(ret), "+m"(ptr):"r"(ptr):"memory");
+			__asm__ __volatile__(CVMX_PUSH_OCTEON2_STR
+					     "lad  %0,(%2)"
+					     CVMX_POP_OCTEON2_STR:"=r"(ret), "+m"(ptr):"r"(ptr):"memory");
 		} else {
-			__asm__ __volatile__("laa  %0,(%2),%3":"=r"(ret), "+m"(ptr):"r"(ptr), "r"(incr):"memory");
+			__asm__ __volatile__(CVMX_PUSH_OCTEON2_STR
+					     "laa  %0,(%2),%3"
+					     CVMX_POP_OCTEON2_STR:"=r"(ret), "+m"(ptr):"r"(ptr), "r"(incr):"memory");
 		}
-		CVMX_POP_OCTEON2;
 	}
 #else
 	{
@@ -605,15 +613,19 @@ static inline uint64_t cvmx_atomic_swap64_nosync(uint64_t * ptr, uint64_t new_va
 
 #ifdef CVMX_CAVIUM_OCTEON2
 	{
-		CVMX_PUSH_OCTEON2;
 		if (__builtin_constant_p(new_val) && new_val == 0) {
-			__asm__ __volatile__("lacd  %0,(%1)":"=r"(ret):"r"(ptr):"memory");
+			__asm__ __volatile__(CVMX_PUSH_OCTEON2_STR
+					     "lacd  %0,(%1)"
+					     CVMX_POP_OCTEON2_STR:"=r"(ret):"r"(ptr):"memory");
 		} else if (__builtin_constant_p(new_val) && new_val == ~0ull) {
-			__asm__ __volatile__("lasd  %0,(%1)":"=r"(ret):"r"(ptr):"memory");
+			__asm__ __volatile__(CVMX_PUSH_OCTEON2_STR
+					     "lasd  %0,(%1)"
+					     CVMX_POP_OCTEON2_STR:"=r"(ret):"r"(ptr):"memory");
 		} else {
-			__asm__ __volatile__("lawd  %0,(%1),%2":"=r"(ret):"r"(ptr), "r"(new_val):"memory");
+			__asm__ __volatile__(CVMX_PUSH_OCTEON2_STR
+					     "lawd  %0,(%1),%2"
+					      CVMX_POP_OCTEON2_STR:"=r"(ret):"r"(ptr), "r"(new_val):"memory");
 		}
-		CVMX_POP_OCTEON2;
 	}
 #else
 	{
@@ -654,15 +666,19 @@ static inline uint32_t cvmx_atomic_swap32_nosync(uint32_t * ptr, uint32_t new_va
 
 #ifdef CVMX_CAVIUM_OCTEON2
 	{
-		CVMX_PUSH_OCTEON2;
 		if (__builtin_constant_p(new_val) && new_val == 0) {
-			__asm__ __volatile__("lac  %0,(%1)":"=r"(ret):"r"(ptr):"memory");
+			__asm__ __volatile__(CVMX_PUSH_OCTEON2_STR
+					     "lac  %0,(%1)"
+					     CVMX_POP_OCTEON2_STR:"=r"(ret):"r"(ptr):"memory");
 		} else if (__builtin_constant_p(new_val) && new_val == ~0u) {
-			__asm__ __volatile__("las  %0,(%1)":"=r"(ret):"r"(ptr):"memory");
+			__asm__ __volatile__(CVMX_PUSH_OCTEON2_STR
+					     "las  %0,(%1)"
+					     CVMX_POP_OCTEON2_STR:"=r"(ret):"r"(ptr):"memory");
 		} else {
-			__asm__ __volatile__("law  %0,(%1),%2":"=r"(ret):"r"(ptr), "r"(new_val):"memory");
+			__asm__ __volatile__(CVMX_PUSH_OCTEON2_STR
+					     "law  %0,(%1),%2"
+					     CVMX_POP_OCTEON2_STR:"=r"(ret):"r"(ptr), "r"(new_val):"memory");
 		}
-		CVMX_POP_OCTEON2;
 	}
 #else
 	{
@@ -680,6 +696,109 @@ static inline uint32_t cvmx_atomic_swap32_nosync(uint32_t * ptr, uint32_t new_va
 #endif
 
 	return (ret);
+}
+
+#ifdef CVMX_CAVIUM_OCTEON3
+/**
+ * Atomically sets a 128 bit (aligned) memory location to a value
+ *
+ * @param ptr    address of memory to set
+ * @param value  value to set memory location to.
+ *
+ * @return 0 on success, -1 on error
+ */
+static inline int cvmx_atomic_set128(void *ptr, int64_t value[2])
+{
+	unsigned off;
+	unsigned long pl, ph;
+	uint64_t tmp, ls, ms;
+	uint64_t lm_loc = CVMX_SCRATCH_BASE + CVMX_PKO_LMTLINE * CVMX_CACHE_LINE_SIZE;
+
+	if (cvmx_unlikely(!OCTEON_IS_OCTEON3())) {
+		cvmx_warn("atomic_set128: not supported on this chip\n");
+		return -1;
+	}
+
+	pl = (unsigned long)ptr;
+	ph = pl + 8;
+	if ((pl & 7) || ((pl ^ ph) & ~0x7ful)) {
+		cvmx_warn("atomic_set128: Improper alignment\n");
+		return -1;
+	}
+
+	off = (uintptr_t)ptr & (CVMX_CACHE_LINE_SIZE-1);
+	lm_loc += off;
+
+	ls = value[0]; /* least significant */
+	ms = value[1]; /* most significant */
+	/* See HRM section 2.23.2 */
+	do {
+		tmp = ms;
+		asm volatile(
+			"\n"
+			"	.set push\n"
+			"	.set noreorder\n"
+			"	lld	$0, 0(%[ptr])\n"
+			"	sd	%[ls], 0(%[lm_loc])\n"
+			"	scd	%[tmp], 8(%[ptr])\n"
+			"	.set pop"
+			: [tmp] "+&r" (tmp)
+			: [lm_loc] "r" (lm_loc), [ls] "r" (ls), [ptr] "r" (pl)
+			: "memory"); 
+	} while (tmp == 0);
+	return 0;
+}
+#endif /* CVMX_CAVIUM_OCTEON3 */
+
+/**
+ * Returns the current value of a 128 bit (aligned) memory
+ * location.
+ *
+ * @param ptr    Address of memory to get
+ * @para [out] data	An array of two 64-bit words to hold the result
+ *
+ * @return 0 on success, -1 on error
+ */
+static inline int cvmx_atomic_get128(void *ptr, int64_t *data)
+{
+	unsigned long pl, ph;
+	uint64_t ms, ls, tmp, start_cycle, end_cycle;
+
+	pl = (unsigned long)ptr;
+	ph = pl + 8;
+	if ((pl & 7) || ((pl ^ ph) & ~0x7ful)) {
+		cvmx_warn("atomic_set128: Improper alignment\n");
+		return -1;
+	}
+
+	/* If the elapsed time to do two loads from locations in the
+	 * same cache line is 10 cycles or less, then no intervening
+	 * cache miss could have occurred, and the loads were atomic.
+	 * If it took more than 10 cycles, then there may have been a
+	 * cache miss, and we retry.
+	 */
+	do {
+		asm volatile(
+			"\n"
+			"	.set push\n"
+			"	.set noreorder\n"
+			"	rdhwr	%[sc], $31\n"
+			"	ld	%[ls], 0(%[ptr])\n"
+			"	ld	%[ms], 8(%[ptr])\n"
+			/* Consume the results of the two LD */
+			"	or	%[tmp], %[ms], %[ls]\n"
+			"	rdhwr	%[ec], $31\n"
+			"	.set pop"
+			: [sc] "=&r" (start_cycle),  [ec] "=&r" (end_cycle),
+			[tmp] "=&r" (tmp), [ms] "=&r" (ms), [ls] "=&r" (ls)
+			: [ptr] "r" (pl)
+			);
+	} while (end_cycle - start_cycle > 10);
+
+	data[0] = ls; /* least significant */
+	data[1] = ms; /* most significant */
+
+	return 0;
 }
 
 #ifdef	__cplusplus

@@ -2119,14 +2119,6 @@ static inline void cvmx_pow_tag_sw_nocheck(uint32_t tag, cvmx_pow_tag_type_t tag
 	 */
 	tag_req.u64 = 0;
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-		cvmx_wqe_t *wqp = cvmx_pow_get_current_wqp();
-		if (wqp == NULL) {
-			cvmx_dprintf("ERROR: Failed to get WQE, %s\n", __func__);
-			return;
-		}
-		wqp->word1.cn78xx.tag = tag;
-		wqp->word1.cn78xx.tag_type = tag_type;
-		CVMX_SYNCWS;
 		tag_req.s_cn78xx_other.op   = CVMX_POW_TAG_OP_SWTAG;
 		tag_req.s_cn78xx_other.type = tag_type;
 	} else if (octeon_has_feature(OCTEON_FEATURE_CN68XX_WQE)) {
@@ -2213,6 +2205,7 @@ static inline void cvmx_pow_tag_sw_full_nocheck(cvmx_wqe_t * wqp, uint32_t tag,
 	union cvmx_pow_tag_req_addr ptr;
 	cvmx_pow_tag_req_t tag_req;
 	unsigned node = cvmx_get_node_num();
+	uint64_t wqp_phys = cvmx_ptr_to_phys(wqp);
 
 	if (CVMX_ENABLE_POW_CHECKS) {
 		cvmx_pow_tag_info_t current_tag;
@@ -2238,11 +2231,12 @@ static inline void cvmx_pow_tag_sw_full_nocheck(cvmx_wqe_t * wqp, uint32_t tag,
 	tag_req.u64 = 0;
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
 		unsigned xgrp;
-		uint64_t wqp_phys;
 
-		wqp_phys = cvmx_ptr_to_phys(wqp);
 		if(wqp_phys!= 0x80) {
-			/* If WQE is valid, use its XGRP.  WQE GRP is 10 bits, includes node # */
+			/* If WQE is valid, use its XGRP:
+			 * WQE GRP is 10 bits, and is mapped
+			 * to legacy GRP + QoS, includes node number.
+			 */
 			xgrp = wqp->word1.cn78xx.grp;
 			/* Use XGRP[node] too */
 			node = xgrp >> 8;
@@ -2250,10 +2244,6 @@ static inline void cvmx_pow_tag_sw_full_nocheck(cvmx_wqe_t * wqp, uint32_t tag,
 			xgrp &= ~0xf8;
 			xgrp |= 0xf8 & (group << 3);
 
-			wqp->word1.cn78xx.grp = xgrp;
-			wqp->word1.cn78xx.tag = tag;
-			wqp->word1.cn78xx.tag_type = tag_type;
-			CVMX_SYNCWS;
 		} else {
 			/* If no WQE, build XGRP with QoS=0 and current node */
 			xgrp = group << 3;
@@ -2287,7 +2277,7 @@ static inline void cvmx_pow_tag_sw_full_nocheck(cvmx_wqe_t * wqp, uint32_t tag,
 		ptr.s.mem_region = CVMX_IO_SEG;
 		ptr.s.is_io = 1;
 		ptr.s.did = CVMX_OCT_DID_TAG_SWTAG;
-		ptr.s.addr = cvmx_ptr_to_phys(wqp);
+		ptr.s.addr = wqp_phys;
 	}
 	/* Once this store arrives at POW, it will attempt the switch
 	   software must wait for the switch to complete separately */
@@ -2350,7 +2340,7 @@ static inline void cvmx_pow_tag_sw_null_nocheck(void)
 		tag_req.s_cn78xx_other.op = CVMX_POW_TAG_OP_SWTAG;
 		tag_req.s_cn78xx_other.type = CVMX_POW_TAG_TYPE_NULL;
 	}
-	if (octeon_has_feature(OCTEON_FEATURE_CN68XX_WQE)) {
+	else if (octeon_has_feature(OCTEON_FEATURE_CN68XX_WQE)) {
 		tag_req.s_cn68xx_other.op = CVMX_POW_TAG_OP_SWTAG;
 		tag_req.s_cn68xx_other.type = CVMX_POW_TAG_TYPE_NULL;
 	} else {
@@ -3097,8 +3087,11 @@ static inline void cvmx_pow_set_xgrp_mask( uint64_t core_num,
 	}
 
 	if (CVMX_ENABLE_POW_CHECKS) {
-		cvmx_warn_if(mask_set < 1 || mask_set > 3, "Invalid mask set");
+		cvmx_warn_if(((mask_set < 1) || (mask_set > 3)), "Invalid mask set");
 	}
+
+	if ((mask_set < 1) || (mask_set > 3))
+		mask_set = 3;
 
 	node = cvmx_coremask_core_to_node(core_num);
 	core = cvmx_coremask_core_on_node(core_num);
@@ -3216,7 +3209,7 @@ static inline void cvmx_pow_tag_sw_full_node(cvmx_wqe_t * wqp, uint32_t tag,
 	tag_req.u64 = 0;
 	tag_req.s_cn78xx_other.op = CVMX_POW_TAG_OP_SWTAG_FULL;
 	tag_req.s_cn78xx_other.type = tag_type;
-	tag_req.s_cn78xx_other.grp = xgrp;
+	tag_req.s_cn78xx_other.grp = gxgrp;
 	tag_req.s_cn78xx_other.wqp = cvmx_ptr_to_phys(wqp);
 
 	ptr.u64 = 0;
@@ -3339,6 +3332,40 @@ static inline void cvmx_pow_tag_sw_desched_node(cvmx_wqe_t *wqe, uint32_t tag,
 	ptr.s_cn78xx.node =  node;
 	ptr.s_cn78xx.tag  = tag;
 	cvmx_write_io(ptr.u64, tag_req.u64);
+}
+
+/* Executes the UPD_WQP_GRP SSO operation.
+ *
+ * @param wqp  Pointer to the new work queue entry to switch to.
+ * @param xgrp SSO group in the range 0..255
+ *
+ * NOTE: The operation can be performed only on the local node.
+ */
+static inline void cvmx_sso_update_wqp_group(cvmx_wqe_t *wqp, uint8_t xgrp)
+{
+	union cvmx_pow_tag_req_addr addr;
+	cvmx_pow_tag_req_t data;
+	int node = cvmx_get_node_num();
+	int group = node <<  8 | xgrp;
+
+	if (!octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
+		cvmx_dprintf("ERROR: %s is not supported on this chip)\n", __FUNCTION__);
+		return;
+	}
+	wqp->word1.cn78xx.grp = group;
+	CVMX_SYNCWS;
+
+	data.u64 = 0;
+	data.s_cn78xx_other.op = CVMX_POW_TAG_OP_UPDATE_WQP_GRP;
+	data.s_cn78xx_other.grp = group;
+	data.s_cn78xx_other.wqp = cvmx_ptr_to_phys(wqp);
+
+	addr.u64 = 0;
+	addr.s_cn78xx.mem_region = CVMX_IO_SEG;
+	addr.s_cn78xx.is_io = 1;
+	addr.s_cn78xx.did = CVMX_OCT_DID_TAG_TAG1;
+	addr.s_cn78xx.node = node;
+	cvmx_write_io(addr.u64, data.u64);
 }
 
 /******************************************************************************/

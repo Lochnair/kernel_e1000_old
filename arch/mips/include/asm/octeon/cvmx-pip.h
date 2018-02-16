@@ -42,7 +42,7 @@
  *
  * Interface to the hardware Packet Input Processing unit.
  *
- * <hr>$Revision: 124170 $<hr>
+ * <hr>$Revision: 137666 $<hr>
  */
 
 #ifndef __CVMX_PIP_H__
@@ -359,7 +359,7 @@ static inline int __cvmx_pip_set_tag_type(int node, int style,
 
 	/* All other style parameters remain same except tag type */
 	cvmx_pki_read_style_config(node, style, CVMX_PKI_CLUSTER_ALL, &style_cfg);
-	style_cfg.parm_cfg.tag_type = tag_type;
+	style_cfg.parm_cfg.tag_type = (enum cvmx_sso_tag_type)tag_type;
 	style_num = cvmx_pki_style_alloc(node, -1);
 	if (style_num < 0) {
 		cvmx_dprintf("ERROR: style not available to set tag type\n");
@@ -585,9 +585,9 @@ static inline void cvmx_pip_config_port(uint64_t ipd_port, cvmx_pip_prt_cfgx_t p
 			tcp_tag = port_tag_cfg.s.tcp6_tag_type;
 		if (port_tag_cfg.s.ip6_tag_type == port_tag_cfg.s.ip4_tag_type)
 			ip_tag = port_tag_cfg.s.ip6_tag_type;
-		pki_prt_cfg.style_cfg.parm_cfg.tag_type = port_tag_cfg.s.non_tag_type;
+		pki_prt_cfg.style_cfg.parm_cfg.tag_type = (enum cvmx_sso_tag_type)port_tag_cfg.s.non_tag_type;
 		if (tcp_tag == ip_tag && tcp_tag == port_tag_cfg.s.non_tag_type)
-			pki_prt_cfg.style_cfg.parm_cfg.tag_type = tcp_tag;
+			pki_prt_cfg.style_cfg.parm_cfg.tag_type = (enum cvmx_sso_tag_type)tcp_tag;
 		else if (tcp_tag == ip_tag) {
 			/* allocate and copy style */
 			/* modify tag type */

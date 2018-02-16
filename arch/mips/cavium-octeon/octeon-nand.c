@@ -416,7 +416,7 @@ static void octeon_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
 		 * Read length must be a multiple of 8, so read a
 		 * little more than we require.
 		 */
-		priv->data_len = cvmx_nand_read_id(priv->selected_chip, 0,
+		priv->data_len = cvmx_nand_read_id(priv->selected_chip, (uint64_t)column,
 						virt_to_phys(priv->data), 16);
 		if (priv->data_len < 16) {
 			dev_err(priv->dev, "READID failed with %d\n",
@@ -434,7 +434,7 @@ static void octeon_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
 		 * reading 8 bytes from the end of page.
 		 */
 		priv->data_len = cvmx_nand_page_read(priv->selected_chip,
-					(page_addr << nand->page_shift) +
+					((uint64_t)page_addr << nand->page_shift) +
 					(1 << nand->page_shift) -
 					priv->data_index,
 					virt_to_phys(priv->data),
@@ -453,7 +453,7 @@ static void octeon_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
 		/* Here mtd->oobsize _must_ already be a multiple of 8 */
 		priv->data_len = cvmx_nand_page_read(priv->selected_chip,
 					column +
-					(page_addr << nand->page_shift),
+					((uint64_t)page_addr << nand->page_shift),
 					virt_to_phys(priv->data),
 					(1 << nand->page_shift) +
 					mtd->oobsize);
@@ -468,7 +468,7 @@ static void octeon_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
 		DEV_DBG(DEBUG_CONTROL, priv->dev,
 			"ERASE1 page_addr=0x%x\n", page_addr);
 		if (cvmx_nand_block_erase(priv->selected_chip,
-			page_addr << nand->page_shift)) {
+			(uint64_t)page_addr << nand->page_shift)) {
 			dev_err(priv->dev, "ERASE1 failed\n");
 		}
 		break;
@@ -501,7 +501,7 @@ static void octeon_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
 	case NAND_CMD_PAGEPROG:
 		DEV_DBG(DEBUG_CONTROL, priv->dev, "PAGEPROG\n");
 		status = cvmx_nand_page_write(priv->selected_chip,
-			priv->selected_page << nand->page_shift,
+			(uint64_t)priv->selected_page << nand->page_shift,
 			virt_to_phys(priv->data));
 		if (status)
 			dev_err(priv->dev, "PAGEPROG failed with %d\n",	status);
@@ -1176,7 +1176,7 @@ static int octeon_nand_hw_bch_init(struct octeon_nand *priv)
 	uint8_t erased_ecc[eccbytes];
 
 	/* Without HW BCH, the ECC callbacks would have not been installed */
-	if (!octeon_has_feature(OCTEON_FEATURE_BCH))
+	if (priv->nand.ecc.mode != NAND_ECC_HW_SYNDROME)
 		return 0;
 
 	priv->eccmask = NULL;

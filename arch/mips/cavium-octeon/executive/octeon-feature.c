@@ -146,6 +146,7 @@ void octeon_feature_init(void)
 	OCTEON_FEATURE_SET(OCTEON_FEATURE_BGX_XCV);
 	OCTEON_FEATURE_SET(OCTEON_FEATURE_TSO);
 	OCTEON_FEATURE_SET(OCTEON_FEATURE_TDM);
+	OCTEON_FEATURE_SET(OCTEON_FEATURE_PTP);
 	val = OCTEON_FEATURE_SUCCESS;
 
 feature_check:
@@ -237,7 +238,7 @@ int octeon_clear_attr(octeon_attr_t attr)
 
 void octeon_attr_init(void)
 {
-#ifndef CVMX_BUILD_FOR_LINUX_KERNEL
+#if !defined(CVMX_BUILD_FOR_LINUX_KERNEL) && !defined(CVMX_BUILD_FOR_LINUX_HOST)
 	if (cvmx_is_init_core())
 		octeon_set_attr((int)OCTEON_ATTR_INIT_CORE);
 #endif

@@ -43,7 +43,7 @@
  * File defining functions for working with different Octeon
  * models.
  *
- * <hr>$Revision: 122055 $<hr>
+ * <hr>$Revision: 144107 $<hr>
  */
 #ifdef CVMX_BUILD_FOR_LINUX_KERNEL
 #include <asm/octeon/octeon.h>
@@ -482,7 +482,15 @@ const char *octeon_model_get_string_buffer(uint32_t chip_id, char *buffer)
 		family = "73";
 		if (fus_dat3.cn73xx.l2c_crip == 2)
 			family = "72";
-		if (fus_dat3.cn73xx.nozip
+		if (cvmx_fuse_read(76))
+			family = "23";
+		if (cvmx_fuse_read(82)		/* Compression/Decompression */
+		    && cvmx_fuse_read(90)	/* HFA */
+		    && cvmx_fuse_read(102)	/* RAID */
+		    && cvmx_fuse_read(134))	/* HNA */ {
+			family = "72";
+			suffix = "CCP";
+		} else if (fus_dat3.cn73xx.nozip
 				&& fus_dat3.cn73xx.nodfa_dte
 				&& fus_dat3.cn73xx.nohna_dte) {
 			if (!fus_dat2.cn73xx.raid_en) {
@@ -497,12 +505,14 @@ const char *octeon_model_get_string_buffer(uint32_t chip_id, char *buffer)
 		break;
 	case 0x98:		/* CN75XX */
 		family = "F75";
-		if (fus_dat3.cn78xx.nozip
-		    && fus_dat3.cn78xx.nodfa_dte
-		    && fus_dat3.cn78xx.nohna_dte)
-			suffix = "SCP";
+	    if(cvmx_fuse_read(1600))
+		{
+			suffix = "NSP";
+		}
 		else
-			suffix = "AAP";
+		{
+			suffix = "DSP";
+		}
 		break;
 	default:
 		family = "XX";

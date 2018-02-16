@@ -163,8 +163,19 @@
 
 
 #define MAX_70XX_OCLA_COMPLEXES	1
+#define MAX_73XX_OCLA_COMPLEXES	3
+#define MAX_75XX_OCLA_COMPLEXES	3
 #define MAX_78XX_OCLA_COMPLEXES	5
 #define MAX_COMPLEXES		MAX_78XX_OCLA_COMPLEXES
+
+/* These are the ocla hardware revisions and the chips that use them */
+#define IS_OCLA_REV1		(OCTEON_IS_MODEL(OCTEON_CN78XX_PASS1_X) ||     \
+				 OCTEON_IS_MODEL(OCTEON_CN76XX) ||	       \
+				 OCTEON_IS_MODEL(OCTEON_CN70XX))
+
+#define IS_OCLA_REV2		(OCTEON_IS_MODEL(OCTEON_CN78XX_PASS2_X) ||     \
+				 OCTEON_IS_MODEL(OCTEON_CN73XX) ||	       \
+				 OCTEON_IS_MODEL(OCTEON_CNF75XX))
 
 
 /**
@@ -173,11 +184,18 @@
 typedef enum {
 	AGL,
 	ASE,
+	BBX1I,
+	BBX2I,
+	BBX3I,
 	BCH,
 	BGX,
+	BTS,
 	CIU,
+	DENC,
 	DFA,
+	DLFE,
 	DPI,
+	FDEQ,
 	FPA,
 	GMX,
 	GSER,
@@ -188,12 +206,15 @@ typedef enum {
 	IOBP,
 	IOB,
 	IPD,
+	KEY,
 	L2C_CBC,
 	L2C_MCI,
 	L2C_TAD,
 	LAP,
 	LBK,
 	LMC,
+	MDB,
+	MHBW,
 	MIO,
 	OCX_LNK,
 	OCX_OLE,
@@ -206,18 +227,35 @@ typedef enum {
 	PKI_PFE,
 	PKI_PIX,
 	PKO,
+	PNB,
+	PNBD,
 	POW,
+	PRCH,
+	PSM,
 	RAD,
+	RDEC,
+	RFIF,
+	RMAP,
 	RNM,
 	RST,
 	SATA,
 	SLI,
 	SPEM,
+	SRIO,
 	SSO,
+	TDEC,
 	TIM,
+	ULFE,
 	USBH,
 	USBDRD,
+	VDEC,
+	WPSE,
+	WRCE,
+	WRDE,
+	WRSE,
+	WTXE,
 	XCV,
+	XSX,
 	ZIP,
 	INVALID_BLOCK_ID = -1
 } cvmx_dtx_id_t;
@@ -285,8 +323,9 @@ typedef enum {
 	NO_CAP = 0,
 	FSM0_CAP = 2,
 	FSM1_CAP = 4,
-	FSM0_OR_FSM1 = 6,
+	FSM0_OR_FSM1_REV1 = 6,
 	FSM0_AND_FSM1 = 8,
+	FSM0_OR_FSM1_REV2 = 0xe,
 	CAP = 0xf
 } cvmx_cap_sel_t;
 

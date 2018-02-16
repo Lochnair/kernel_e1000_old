@@ -522,7 +522,7 @@ cvmx_srio_init_cn75xx(int srio_port, cvmx_srio_initialize_flags_t flags)
 	rst_ctl.s.rst_chip = 0;
 	cvmx_write_csr(CVMX_RST_CTLX(rst_port), rst_ctl.u64);
 
-	rst_ctl.u64 = cvmx_read_csr(CVMX_MIO_RST_CTLX(rst_port));
+	rst_ctl.u64 = cvmx_read_csr(CVMX_RST_CTLX(rst_port));
 	cvmx_dprintf("INFO: SRIO%d: Port in %s mode\n",
 		srio_port, (rst_ctl.s.host_mode) ? "host" : "endpoint");
 
@@ -546,7 +546,7 @@ cvmx_srio_init_cn75xx(int srio_port, cvmx_srio_initialize_flags_t flags)
 		/* Check and make sure PCIe came out of reset. If it doesn't the board
 	   	probably hasn't wired the clocks up and the interface should be
 	   	skipped */
-		if (CVMX_WAIT_FOR_FIELD64(CVMX_RST_CTLX(rst_port), cvmx_mio_rst_ctlx_t,
+		if (CVMX_WAIT_FOR_FIELD64(CVMX_RST_CTLX(rst_port), cvmx_rst_ctlx_t,
 					rst_done, ==, 1, 10000)) {
 			cvmx_dprintf("SRIO%d stuck in reset, skipping.\n", srio_port);
 			return -1;
@@ -1857,6 +1857,40 @@ uint64_t cvmx_srio_physical_map(int srio_port, cvmx_srio_write_mode_t write_op,
 	   ID is part of the lower address bits. This would allow many more
 	   devices to share S2M_TYPE indexes. This would require "base+size-1"
 	   to fit in bits [17:0] or bits[25:0] for 8 bits of device ID */
+	if (OCTEON_IS_MODEL(OCTEON_CNF75XX)) {
+		if (base < (1ull << 34)) {
+			needed_subid.cnf75xx.ba = destid;
+			needed_s2m_type.s.iaow_sel = 0;
+		} else if (base < (1ull << 42)) {
+			needed_subid.cnf75xx.ba = (base >> 34) & 0xff;
+			needed_subid.cnf75xx.ba |= ((uint64_t) destid & 0xff) << (42 - 34);
+			needed_subid.cnf75xx.ba |= (((uint64_t) destid >> 8) & 0xff) << (51 - 34);
+			needed_s2m_type.s.iaow_sel = 1;
+		} else {
+			if (destid >> 8) {
+				cvmx_dprintf("SRIO%d: Attempt to map 16bit device ID 0x%x using 66bit addressing\n", srio_port, destid);
+				return 0;
+			}
+			if (base >> 50) {
+				cvmx_dprintf("SRIO%d: Attempt to map address 0x%llx using 66bit addressing\n", srio_port, CAST_ULL(base));
+				return 0;
+			}
+			needed_subid.cnf75xx.ba = (base >> 34) & 0xffff;
+			needed_subid.cnf75xx.ba |= ((uint64_t) destid & 0xff) << (51 - 34);
+			needed_s2m_type.s.iaow_sel = 2;
+		}
+
+		/* Find a S2M_TYPE index to use. If this fails return 0 */
+		s2m_index = __cvmx_srio_alloc_s2m(srio_port, needed_s2m_type);
+		if (s2m_index == -1)
+			return 0;
+
+		/* Attach the SubID to the S2M_TYPE index */
+		needed_subid.s.rtype = s2m_index & 3;
+		needed_subid.s.wtype = s2m_index & 3;
+		needed_subid.cnf75xx.ba |= (((uint64_t) s2m_index >> 2) & 1) << (50 - 34);
+		needed_subid.cnf75xx.ba |= (((uint64_t) s2m_index >> 3) & 1) << (59 - 34);
+	} else {
 	if (base < (1ull << 34)) {
 		needed_subid.cn63xx.ba = destid;
 		needed_s2m_type.s.iaow_sel = 0;
@@ -1889,6 +1923,7 @@ uint64_t cvmx_srio_physical_map(int srio_port, cvmx_srio_write_mode_t write_op,
 	needed_subid.s.wtype = s2m_index & 3;
 	needed_subid.cn63xx.ba |= (((uint64_t) s2m_index >> 2) & 1) << (50 - 34);
 	needed_subid.cn63xx.ba |= (((uint64_t) s2m_index >> 3) & 1) << (59 - 34);
+	}
 
 	/* Allocate a SubID for use */
 	subdid = __cvmx_srio_alloc_subid(needed_subid);
@@ -1931,9 +1966,14 @@ int cvmx_srio_physical_unmap(uint64_t physical_address, uint64_t size)
 	   Type[1] is mapped to the No Snoop
 	   Type[2] is mapped directly to bit 50 of the SLI address
 	   Type[3] is mapped directly to bit 59 of the SLI address */
+	if (OCTEON_IS_MODEL(OCTEON_CNF75XX)) {
+		read_s2m_type = (((subid.cnf75xx.ba >> (50 - 34)) & 1) << 2) |
+			(((subid.cnf75xx.ba >> (59 - 34)) & 1) << 3);
+		read_s2m_type |= subid.s.rtype;
+	} else {
 	read_s2m_type = (((subid.cn63xx.ba >> (50 - 34)) & 1) << 2) | 
 		(((subid.cn63xx.ba >> (59 - 34)) & 1) << 3);
-	read_s2m_type |= subid.s.rtype;
+	}
 	__cvmx_srio_free_subid(mem_index);
 	__cvmx_srio_free_s2m(subid.s.port, read_s2m_type);
 	return 0;

@@ -651,11 +651,10 @@ void cvmx_wqe_free(cvmx_wqe_t *work)
 
 /**
  * Free the packet buffers contained in a work queue entry.
- * The work queue entry is not freed.
- * Note that this function will not free the work queue entry
- * even if it contains a non-redundant data packet, and hence
- * it is not really comparable to how the PKO would free a packet
- * buffers if requested.
+ * The work queue entry is also freed if it contains packet data.
+ * If however the packet starts outside the WQE, the WQE will
+ * not be freed. The application should call cvmx_wqe_free()
+ * to free the WQE buffer that contains no packet data.
  *
  * @param work   Work queue entry with packet to free
  */
@@ -664,10 +663,12 @@ void cvmx_helper_free_packet_data(cvmx_wqe_t *work)
 	uint64_t number_buffers;
 	uint64_t start_of_buffer;
 	uint64_t next_buffer_ptr;
+	cvmx_fpa3_gaura_t aura;
 	unsigned ncl;
 	cvmx_buf_ptr_t buffer_ptr;
 	cvmx_buf_ptr_pki_t bptr;
 	cvmx_wqe_78xx_t *wqe = (void *) work;
+	int o3_pki_wqe = 0;
 
 	number_buffers = cvmx_wqe_get_bufs(work);
 
@@ -682,10 +683,11 @@ void cvmx_helper_free_packet_data(cvmx_wqe_t *work)
 	/* Interpret PKI-style bufptr unless it has been translated */
 	if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE) &&
 	    !wqe->pki_wqe_translated) {
+		o3_pki_wqe = 1;
 		cvmx_wqe_pki_errata_20776(work);
-		bptr.u64 = buffer_ptr.u64;
-		next_buffer_ptr = *(uint64_t *)
-			cvmx_phys_to_ptr(bptr.addr - 8);
+		aura = __cvmx_fpa3_gaura(
+			wqe->word0.aura >> 10,
+			wqe->word0.aura & 0x3ff);
 	} else {
 		start_of_buffer =
 			((buffer_ptr.s.addr >> 7) - buffer_ptr.s.back) << 7;
@@ -702,13 +704,7 @@ void cvmx_helper_free_packet_data(cvmx_wqe_t *work)
 		}
 	}
 	while (number_buffers--) {
-		if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE) &&
-		    !wqe->pki_wqe_translated) {
-			cvmx_fpa3_gaura_t aura =
-				__cvmx_fpa3_gaura(
-					wqe->word0.aura >> 10,
-					wqe->word0.aura & 0x3ff);
-
+		if (o3_pki_wqe) {
 			bptr.u64 = buffer_ptr.u64;
 
 			ncl = (bptr.size + CVMX_CACHE_LINE_SIZE-1)/
@@ -737,8 +733,7 @@ void cvmx_helper_free_packet_data(cvmx_wqe_t *work)
 				cvmx_phys_to_ptr(buffer_ptr.s.addr - 8);
 			/* FPA pool comes from buf_ptr itself */
 			if (octeon_has_feature(OCTEON_FEATURE_CN78XX_WQE)) {
-				cvmx_fpa3_gaura_t aura =
-					cvmx_fpa1_pool_to_fpa3_aura(buffer_ptr.s.pool);
+				aura = cvmx_fpa1_pool_to_fpa3_aura(buffer_ptr.s.pool);
 				cvmx_fpa3_free(cvmx_phys_to_ptr(start_of_buffer), aura, ncl);
 			} else
 				cvmx_fpa1_free(
@@ -1131,7 +1126,7 @@ int cvmx_helper_get_interface_num(int ipd_port)
 		for (i = 0; i < CVMX_HELPER_MAX_IFACE; i++) {
 			if (xp.port >= port_map[i].first_ipd_port &&
 			    xp.port <= port_map[i].last_ipd_port)
-				return cvmx_helper_node_interface_to_xiface(xp.node, i);
+				return i;
 		}
 		return -1;
 	} else if (OCTEON_IS_MODEL(OCTEON_CN70XX) && ipd_port == 24) {
@@ -1259,3 +1254,40 @@ int cvmx_helper_get_interface_index_num(int ipd_port)
 	return -1;
 }
 EXPORT_SYMBOL(cvmx_helper_get_interface_index_num);
+
+#ifndef CVMX_BUILD_FOR_LINUX_KERNEL
+/**
+ * Prints out a buffer with the address, hex bytes, and ASCII
+ *
+ * @param	addr	Start address to print on the left
+ * @param[in]	buffer	array of bytes to print
+ * @param	count	Number of bytes to print
+ */
+void cvmx_print_buffer_u8(unsigned addr, const uint8_t *buffer, size_t count)
+{
+	uint i;
+
+	while (count) {
+		unsigned linelen = count < 16 ? count : 16;
+
+		cvmx_dprintf("%08x:", addr);
+
+		for (i = 0; i < linelen; i++)
+			cvmx_dprintf(" %0*x", 2, buffer[i]);
+
+		while (i++ < 17)
+			cvmx_dprintf("   ");
+
+		for (i = 0; i < linelen; i++) {
+			if (buffer[i] >= 0x20 && buffer[i] < 0x7f)
+				cvmx_dprintf("%c", buffer[i]);
+			else
+				cvmx_dprintf(".");
+		}
+		cvmx_dprintf("\n");
+		addr += linelen;
+		buffer += linelen;
+		count -= linelen;
+	}
+}
+#endif

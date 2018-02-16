@@ -39,7 +39,6 @@
 #include <linux/libata.h>
 #include <linux/phy/phy.h>
 #include <linux/regulator/consumer.h>
-#include <linux/pci.h>
 
 /* Enclosure Management Control */
 #define EM_CTRL_MSG_TYPE              0x000f0000
@@ -238,7 +237,6 @@ enum {
 	AHCI_HFLAG_MULTI_MSI		= (1 << 16), /* multiple PCI MSIs */
 	AHCI_HFLAG_NO_DEVSLP		= (1 << 17), /* no device sleep */
 	AHCI_HFLAG_NO_FBS		= (1 << 17), /* no FBS */
-	AHCI_HFLAG_MSIX			= (1 << 19), /* PCI MSIX  */
 
 	/* ap->flags bits */
 
@@ -331,7 +329,6 @@ struct ahci_host_priv {
 	struct clk		*clks[AHCI_MAX_CLKS]; /* Optional */
 	struct regulator	*target_pwr;	/* Optional */
 	struct phy		*phy;		/* If platform uses phy */
-	struct msix_entry  	*msix_entries;
 	void			*plat_data;	/* Other platform data */
 	/*
 	 * Optional ahci_start_engine override, if not set this gets set to the

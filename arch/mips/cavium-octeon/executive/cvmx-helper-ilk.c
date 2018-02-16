@@ -771,7 +771,7 @@ cvmx_helper_link_info_t __cvmx_helper_ilk_link_get(int ipd_port)
 
 retry:
 	retry_count++;
-	if (retry_count > 10)
+	if (retry_count > 200)
 		goto fail;
 
 	/* Read RX config and status bits */
@@ -781,12 +781,15 @@ retry:
 	if (ilk_rxx_cfg1.s.rx_bdry_lock_ena == 0) {
 		/* (GSER-21957) GSER RX Equalization may make >= 5gbaud non-KR
 		   channel better */
-		if (OCTEON_IS_MODEL(OCTEON_CN78XX_PASS1_X)) {
+		if (OCTEON_IS_MODEL(OCTEON_CN78XX)) {
 			int qlm, lane_mask;
 			for (qlm = 4; qlm < 8; qlm++) {
 				lane_mask = 1 << (qlm - 4) * 4;
 				if (lane_mask & cvmx_ilk_lane_mask[node][interface]) {
-					__cvmx_qlm_rx_equalization(node, qlm, -1);
+					if (__cvmx_qlm_rx_equalization(node, qlm, -1)) {
+						/*cvmx_dprintf("%d:ILK%d: Waiting for RX Equalization on QLM%d\n", node, interface, qlm); */
+						goto retry;
+					}
 				}
 			}
 		}
@@ -801,6 +804,7 @@ retry:
 		ilk_rxx_cfg1.s.rx_align_ena = 0;
 		cvmx_write_csr_node(node, CVMX_ILK_RXX_CFG1(interface), ilk_rxx_cfg1.u64);
 		//cvmx_dprintf("ILK%d: Looking for word boundary lock\n", interface);
+		cvmx_wait_usec(50);
 		goto retry;
 	}
 
@@ -815,9 +819,9 @@ retry:
 			ilk_rxx_cfg1.s.rx_align_ena = 1;
 			cvmx_write_csr_node(node, CVMX_ILK_RXX_CFG1(interface), ilk_rxx_cfg1.u64);
 			//printf("ILK%d: Looking for lane alignment\n", interface);
-			goto retry;
 		}
-		goto fail;
+		cvmx_wait_usec(50);
+		goto retry;
 	}
 
 	if (ilk_rxx_int.s.lane_align_fail) {
@@ -871,7 +875,8 @@ retry:
 
 #ifndef CVMX_BUILD_FOR_LINUX_KERNEL
 	/* Enable error interrupts, now link is up */
-	cvmx_error_enable_group(CVMX_ERROR_GROUP_ILK, 0);
+	cvmx_error_enable_group(CVMX_ERROR_GROUP_ILK,
+			node | (interface << 2) | (lane_mask << 4));
 #endif
 
 	result.s.link_up = 1;

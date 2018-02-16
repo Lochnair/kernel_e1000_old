@@ -10,7 +10,6 @@
 # Normal rules
 #
 .*
-!.config
 *.o
 *.o.*
 *.a
@@ -82,6 +81,7 @@ GSYMS
 GTAGS
 
 *.orig
+*.rej
 *~
 \#*#
 

@@ -1,5 +1,5 @@
 /***********************license start***************
- * Copyright (c) 2013  Cavium Inc. (support@cavium.com). All rights
+ * Copyright (c) 2013-2016  Cavium Inc. (support@cavium.com). All rights
  * reserved.
  *
  *
@@ -88,9 +88,9 @@ CVMX_SHARED cvmx_bch_app_config_t bch_config = {
 	.aura = 6
 };
 
+const unsigned bch_buf_count = 16;
 #ifdef CVMX_BUILD_FOR_LINUX_KERNEL
 extern int cvm_oct_alloc_fpa_pool(int pool, int size);
-const unsigned bch_buf_count = 16;
 #endif
 
 /**
@@ -109,17 +109,31 @@ int cvmx_bch_initialize(void)
 
 	/* Initialize FPA pool for BCH pool buffers */
 #ifdef CVMX_BUILD_FOR_LINUX_KERNEL
-	bch_pool = CVMX_FPA_OUTPUT_BUFFER_POOL;
+	/* Dynamically allocate pool */
+	bch_pool = -1;
 	bch_pool_size = CVMX_FPA_OUTPUT_BUFFER_POOL_SIZE;
 	buf_cnt = bch_buf_count;
 
 	debug("pool: %d, pool size: %llu, bufcount %d\n",
 		bch_pool, bch_pool_size, buf_cnt);
 	/* Setup the FPA */
-	if (octeon_has_feature(OCTEON_FEATURE_FPA3))
-		/* FIXME */
+	if (octeon_has_feature(OCTEON_FEATURE_FPA3)) {
+		int cmd_pool;
+		int cmd_aura;
+		struct kmem_cache *cmd_pool_cache;
+		void *cmd_pool_stack;
+		octeon_fpa3_init(0);
+		octeon_fpa3_pool_init(0, bch_pool, &cmd_pool, &cmd_pool_stack, 4096);
+		octeon_fpa3_aura_init(0, cmd_pool, bch_pool, &cmd_aura, buf_cnt, 20480);
+		bch_pool = cmd_aura;
+		cmd_pool_cache = kmem_cache_create("bch_cmd", bch_pool_size, 128, 0, NULL);
+		if (!cmd_pool_cache) {
+			printk("cvm_oct_alloc_fpa_pool(%d, %lld)\n",
+						bch_pool, bch_pool_size);
 		return -ENOMEM;
-	else
+		}
+		octeon_fpa3_mem_fill(0, cmd_pool_cache, cmd_aura, 128);
+	} else {
 		cvmx_fpa1_enable();
 
 	bch_pool = cvm_oct_alloc_fpa_pool(bch_pool, bch_pool_size);
@@ -131,10 +145,11 @@ int cvmx_bch_initialize(void)
 
 	for (i = 0; i < buf_cnt; i++)
 		cvmx_fpa_free(kmalloc(bch_pool_size, GFP_KERNEL), bch_pool, 0);
+	}
 #else
 	bch_pool = (int)cvmx_fpa_get_bch_pool();
 	bch_pool_size = cvmx_fpa_get_bch_pool_block_size();
-	i = buf_cnt = bch_config.command_queue_pool.buffer_count;
+	i = buf_cnt = bch_buf_count;
 
 	debug("%s: pool: %d, pool size: %llu, buffer count: %llu\n", __func__,
 	      bch_pool, bch_pool_size, buf_cnt);
