@@ -13,7 +13,7 @@ pipeline {
 
         stage('Prepare for out-of-tree builds') {
             steps {
-                sh 'make -j5 ARCH=mips CROSS_COMPILE=mips64-octeon-linux- prepare modules_prepare'
+                sh 'make -j1 ARCH=mips CROSS_COMPILE=mips64-octeon-linux- prepare modules_prepare'
                 sh 'rm -rf tmp && mkdir tmp'
                 sh 'tar --exclude-vcs --exclude=tmp -cf tmp/e1000-ksrc.tar .'
                 sh 'mv tmp/e1000-ksrc.tar e1000-ksrc.tar'
@@ -22,7 +22,7 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh 'make -j5 ARCH=mips CROSS_COMPILE=mips64-octeon-linux- vmlinux modules'
+                sh 'make -j1 ARCH=mips CROSS_COMPILE=mips64-octeon-linux- vmlinux modules'
             }
         }
         
