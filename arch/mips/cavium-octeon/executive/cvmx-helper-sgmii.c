@@ -637,9 +637,11 @@ cvmx_helper_link_info_t __cvmx_helper_sgmii_link_get(int ipd_port)
 	union cvmx_pcsx_mrx_control_reg pcsx_mrx_control_reg;
 	int speed = 1000;
 	int qlm;
-#if 1	
+
+#if defined(CONFIG_UBNT_E1000) || defined(CONFIG_UBNT_E1020)
 	union cvmx_pcsx_anx_results_reg pcs_anx_results;
-#endif
+#endif /* CONFIG_UBNT_E1000 || CONFIG_UBNT_E1020*/
+
 	result.u64 = 0;
 
 	if (!cvmx_helper_is_port_valid(interface, index))
@@ -684,9 +686,9 @@ cvmx_helper_link_info_t __cvmx_helper_sgmii_link_get(int ipd_port)
 
 	pcsx_miscx_ctl_reg.u64 =
 		cvmx_read_csr(CVMX_PCSX_MISCX_CTL_REG(index, interface));
-#if 1 
-	if (pcsx_miscx_ctl_reg.s.mac_phy){
-		pcs_anx_results.u64 = cvmx_read_csr(CVMX_PCSX_ANX_RESULTS_REG(index, interface)); 
+#if defined(CONFIG_UBNT_E1000) || defined(CONFIG_UBNT_E1020)
+	if (pcsx_miscx_ctl_reg.s.mac_phy) {
+		pcs_anx_results.u64 = cvmx_read_csr(CVMX_PCSX_ANX_RESULTS_REG(index, interface));
 		result.s.speed = speed;
 		result.s.full_duplex = 1;
 		result.s.link_up = pcs_anx_results.s.link_ok;
@@ -696,11 +698,12 @@ cvmx_helper_link_info_t __cvmx_helper_sgmii_link_get(int ipd_port)
 	    cvmx_helper_get_port_force_link_up(interface, index)) {
 		/* PHY Mode */
 		/* Note that this also works for 1000base-X mode */
+
 		result.s.speed = speed;
 		result.s.full_duplex = 1;
 		result.s.link_up = 1;
 		return result;
-#endif		
+#endif /* CONFIG_UBNT_E1000 || CONFIG_UBNT_E1020*/
 	} else {
 		/* MAC Mode */
 		result = __cvmx_helper_board_link_get(ipd_port);
@@ -735,11 +738,7 @@ int __cvmx_helper_sgmii_link_set(int ipd_port,
 	 * down the PCS interface when the link goes down and power it back
 	 * up when the link returns.
 	 */
-#if 0
-	if(1){
-#else
 	if (link_info.s.link_up || !__cvmx_helper_need_g15618()) {
-#endif		
 		__cvmx_helper_sgmii_hardware_init_link(interface, index);
 	} else {
 		union cvmx_pcsx_miscx_ctl_reg pcsx_miscx_ctl_reg;
