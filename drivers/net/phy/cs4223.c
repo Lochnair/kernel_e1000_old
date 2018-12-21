@@ -92,7 +92,6 @@ EXPORT_SYMBOL(cs4223_phy_write);
 
 int cs4224_enable_monitor_sense_points(int set_num)
 {
-   	int phy_addr;
 	int regnum ,reg_data;
 	
 	regnum = CS4224_MONITOR_CONTROL0;
@@ -170,14 +169,14 @@ EXPORT_SYMBOL(cs4223_read_temp);
 
 static int cortina_phy_read_x(struct phy_device *phydev, int off, u16 regnum)
 {
-	return mdiobus_read(phydev->bus, phydev->addr + off,
+	return mdiobus_read(phydev->mdio.bus, phydev->mdio.addr + off,
 			    MII_ADDR_C45 | regnum);
 }
 
 static int cortina_phy_write_x(struct phy_device *phydev, int off,
 			      u16 regnum, u16 val)
 {
-	return mdiobus_write(phydev->bus, phydev->addr + off,
+	return mdiobus_write(phydev->mdio.bus, phydev->mdio.addr + off,
 			     MII_ADDR_C45 | regnum, val);
 }
 static int cortina_phy_read(struct phy_device *phydev, u16 regnum)
@@ -265,10 +264,10 @@ static struct phy_driver cs4223_phy_driver = {
 	.probe		= cs4223_probe,
 	.config_aneg	= cs4223_config_aneg,
 	.read_status	= cs4223_read_status,
-	.driver		= {
-		.owner = THIS_MODULE,
-		.of_match_table = cs4223_match,
-	},
+//	.driver		= {
+//		.owner = THIS_MODULE,
+//		.of_match_table = cs4223_match,
+//	},
 };
 
 int __init cs4223_drv_init(void)

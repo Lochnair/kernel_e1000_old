@@ -3,7 +3,7 @@
  * Copyright (C) 2007-2008, Advanced Micro Devices, Inc.
  * Copyright (C) 2008 Jordan Crouse <jordan@cosmicpenguin.net>
  * Copyright (C) 2008 Hans de Goede <hdegoede@redhat.com>
- * Copyright (C) 2009 Jean Delvare <khali@linux-fr.org>
+ * Copyright (C) 2009 Jean Delvare <jdelvare@suse.de>
  *
  * Derived from the lm83 driver by Jean Delvare
  *
@@ -190,16 +190,12 @@ struct adt7475_data {
 };
 
 static struct i2c_driver adt7475_driver;
-static struct adt7475_data *adt7475_update_device(struct i2c_client *client);
+static struct adt7475_data *adt7475_update_device(struct device *dev);
 static void adt7475_read_hystersis(struct i2c_client *client);
 static void adt7475_read_pwm(struct i2c_client *client, int index);
 
 /* Given a temp value, convert it to register value */
 
-#define SUPPORT_UBNT_SYSFS
-#ifdef SUPPORT_UBNT_SYSFS
-static struct i2c_client *adt7475_i2c_client = NULL;
-#endif
 static inline u16 temp2reg(struct adt7475_data *data, long val)
 {
 	u16 ret;
@@ -326,8 +322,7 @@ static int find_nearest(long val, const int *array, int size)
 static ssize_t show_voltage(struct device *dev, struct device_attribute *attr,
 			    char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct adt7475_data *data = adt7475_update_device(client);
+	struct adt7475_data *data = adt7475_update_device(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
 	unsigned short val;
 
@@ -382,8 +377,7 @@ static ssize_t set_voltage(struct device *dev, struct device_attribute *attr,
 static ssize_t show_temp(struct device *dev, struct device_attribute *attr,
 			 char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct adt7475_data *data = adt7475_update_device(client);
+	struct adt7475_data *data = adt7475_update_device(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
 	int out;
 
@@ -545,8 +539,7 @@ static const int autorange_table[] = {
 static ssize_t show_point2(struct device *dev, struct device_attribute *attr,
 			   char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct adt7475_data *data = adt7475_update_device(client);
+	struct adt7475_data *data = adt7475_update_device(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
 	int out, val;
 
@@ -604,8 +597,7 @@ static ssize_t set_point2(struct device *dev, struct device_attribute *attr,
 static ssize_t show_tach(struct device *dev, struct device_attribute *attr,
 			 char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct adt7475_data *data = adt7475_update_device(client);
+	struct adt7475_data *data = adt7475_update_device(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
 	int out;
 
@@ -643,8 +635,7 @@ static ssize_t set_tach(struct device *dev, struct device_attribute *attr,
 static ssize_t show_pwm(struct device *dev, struct device_attribute *attr,
 			char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct adt7475_data *data = adt7475_update_device(client);
+	struct adt7475_data *data = adt7475_update_device(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
 
 	return sprintf(buf, "%d\n", data->pwm[sattr->nr][sattr->index]);
@@ -653,8 +644,7 @@ static ssize_t show_pwm(struct device *dev, struct device_attribute *attr,
 static ssize_t show_pwmchan(struct device *dev, struct device_attribute *attr,
 			    char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct adt7475_data *data = adt7475_update_device(client);
+	struct adt7475_data *data = adt7475_update_device(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
 
 	return sprintf(buf, "%d\n", data->pwmchan[sattr->index]);
@@ -663,8 +653,7 @@ static ssize_t show_pwmchan(struct device *dev, struct device_attribute *attr,
 static ssize_t show_pwmctrl(struct device *dev, struct device_attribute *attr,
 			    char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct adt7475_data *data = adt7475_update_device(client);
+	struct adt7475_data *data = adt7475_update_device(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
 
 	return sprintf(buf, "%d\n", data->pwmctl[sattr->index]);
@@ -832,8 +821,7 @@ static const int pwmfreq_table[] = {
 static ssize_t show_pwmfreq(struct device *dev, struct device_attribute *attr,
 			    char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct adt7475_data *data = adt7475_update_device(client);
+	struct adt7475_data *data = adt7475_update_device(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
 
 	return sprintf(buf, "%d\n",
@@ -871,8 +859,7 @@ static ssize_t set_pwmfreq(struct device *dev, struct device_attribute *attr,
 static ssize_t show_pwm_at_crit(struct device *dev,
 				struct device_attribute *devattr, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct adt7475_data *data = adt7475_update_device(client);
+	struct adt7475_data *data = adt7475_update_device(dev);
 	return sprintf(buf, "%d\n", !!(data->config4 & CONFIG4_MAXDUTY));
 }
 
@@ -926,8 +913,7 @@ static ssize_t set_vrm(struct device *dev, struct device_attribute *devattr,
 static ssize_t show_vid(struct device *dev, struct device_attribute *devattr,
 			char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct adt7475_data *data = adt7475_update_device(client);
+	struct adt7475_data *data = adt7475_update_device(dev);
 	return sprintf(buf, "%d\n", vid_from_reg(data->vid, data->vrm));
 }
 
@@ -1421,9 +1407,6 @@ static int adt7475_probe(struct i2c_client *client,
 			 (data->bypass_attn & (1 << 3)) ? " in3" : "",
 			 (data->bypass_attn & (1 << 4)) ? " in4" : "");
 
-#ifdef SUPPORT_UBNT_SYSFS
-	adt7475_i2c_client = client;
-#endif
 	return 0;
 
 eremove:
@@ -1519,8 +1502,9 @@ static void adt7475_read_pwm(struct i2c_client *client, int index)
 	}
 }
 
-static struct adt7475_data *adt7475_update_device(struct i2c_client *client)
+static struct adt7475_data *adt7475_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct adt7475_data *data = i2c_get_clientdata(client);
 	u16 ext;
 	int i;
@@ -1639,127 +1623,6 @@ static struct adt7475_data *adt7475_update_device(struct i2c_client *client)
 
 	return data;
 }
-
-#ifdef SUPPORT_UBNT_SYSFS
-int adt7475_set_pwm(int fan_id, int pwm_val)
-{
-	int reg;
-	struct adt7475_data *data = i2c_get_clientdata(adt7475_i2c_client);
-	struct sensor_device_attribute_2 *sattr = NULL;
-
-	if(pwm_val < 0 || pwm_val >100)
-		return -1;
-
-	switch (fan_id) {
-		case 1:
-			sattr = &sensor_dev_attr_pwm1;
-			break;
-		case 2:
-			sattr = &sensor_dev_attr_pwm2;
-			break;
-		case 3:
-			sattr = &sensor_dev_attr_pwm3;
-			break;
-		default:
-			break;
-	}
-
-	mutex_lock(&data->lock);
-
-	reg = PWM_REG(sattr->index);
-	data->pwm[sattr->nr][sattr->index] = pwm_val;
-	i2c_smbus_write_byte_data(adt7475_i2c_client, reg,
-				  data->pwm[sattr->nr][sattr->index]);
-	mutex_unlock(&data->lock);
-	
-	return 0;
-
-}
-EXPORT_SYMBOL(adt7475_set_pwm);
-
-int adt7475_get_pwm(int fan_id)
-{
-	int out;
-	struct adt7475_data *data = i2c_get_clientdata(adt7475_i2c_client);
-	struct sensor_device_attribute_2 *sattr = NULL;
-
-	switch (fan_id) {
-		case 1:
-			sattr = &sensor_dev_attr_pwm1;
-			break;
-		case 2:
-			sattr = &sensor_dev_attr_pwm2;
-			break;
-		case 3:
-			sattr = &sensor_dev_attr_pwm3;
-			break;
-		default:
-			break;
-	}
-	
-	out = data->pwm[sattr->nr][sattr->index];
-//	printk(KERN_INFO "out = %d \n", out);
-	return out;
-
-}
-EXPORT_SYMBOL(adt7475_get_pwm);
-
-int adt7475_get_tach(int fan_id)
-{
-	int out;
-	struct adt7475_data *data = i2c_get_clientdata(adt7475_i2c_client);
-	struct sensor_device_attribute_2 *sattr = NULL;
-
-	switch (fan_id) {
-		case 1:
-			sattr = &sensor_dev_attr_fan1_input;
-			break;
-		case 2:
-			sattr = &sensor_dev_attr_fan2_input;
-			break;
-		case 3:
-			sattr = &sensor_dev_attr_fan3_input;
-			break;
-		default:
-			break;
-	}
-
-	out = tach2rpm(data->tach[sattr->nr][sattr->index]);
-	return out;
-
-}
-EXPORT_SYMBOL(adt7475_get_tach);
-
-int adt7475_get_temp(int temp_id)
-{	
-	int out;
-	struct adt7475_data *data = adt7475_update_device(adt7475_i2c_client);
-	struct sensor_device_attribute_2 *sattr = NULL;
-
-	
-	switch (temp_id) {
-		case 1:
-			sattr = &sensor_dev_attr_temp1_input;
-			break;
-		case 2:
-			sattr = &sensor_dev_attr_temp2_input;
-			break;
-		case 3:
-			sattr = &sensor_dev_attr_temp3_input;
-			break;
-		default:
-			break;
-	}
-	mutex_lock(&data->lock);
-//	printk(KERN_INFO "sattr->nr = %d, sattr->index =%d  \n", sattr->nr,sattr->index);
-	out = reg2temp(data, data->temp[sattr->nr][sattr->index]);
-	mutex_unlock(&data->lock);
-	return out;
-}
-
-EXPORT_SYMBOL(adt7475_get_temp);
-#endif
-
 
 module_i2c_driver(adt7475_driver);
 
