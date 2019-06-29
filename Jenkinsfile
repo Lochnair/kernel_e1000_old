@@ -18,11 +18,11 @@ pipeline {
             }
         }
 
-        stage('Prepare') {
+        /*stage('Prepare') {
             steps {
                 sh 'make ARCH=mips ubnt_er_e1000_defconfig'
             }
-        }
+        }*/
 
         stage('Prepare for out-of-tree builds') {
             steps {
